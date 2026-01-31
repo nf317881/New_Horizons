@@ -1,0 +1,19 @@
+Hardcode renderer - open gl
+Json loader
+
+Randomly select rules for the biome: sunlight, gravity, temperature, air pressure, …
+Gemini pro: decide overview of biome
+    Terrain generation - gemini
+        Rules for texturing terrain - gemini
+        Generating texture - nano banana
+    Plant generation - gemini
+        Model/animation - https://app.anything.world/mesh-generation 
+    Any prop (like rocks) - gemini
+        Model - https://app.anything.world/mesh-generation 
+    Weather rules - gemini
+        Shaders (fog, skybox), wind, rain
+    Sound - gemini
+        https://elevenlabs.io/sound-effects for effects
+        https://elevenlabs.io/music for songs
+    Animals spawn/movement rules - gemini
+        Model/animation - https://app.anything.world/mesh-generation 
