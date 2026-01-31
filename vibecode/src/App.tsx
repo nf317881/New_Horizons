@@ -7,6 +7,7 @@ import { generateMockBiome } from './utils/mockGenerator'
 import type { BiomeData } from './types/biome'
 import { PlayerControls } from './components/PlayerControls'
 import { Group } from 'three'
+import { generateRandomParameters, generateBiomeDescription, generateBiomeData } from './services/ai'
 
 function Scene({ biome, mode }: { biome: BiomeData, mode: 'fly' | 'walk' }) {
   const terrainRef = useRef<Group>(null);
@@ -46,13 +47,46 @@ function Scene({ biome, mode }: { biome: BiomeData, mode: 'fly' | 'walk' }) {
 function App() {
   console.log("App Rendering...");
   // Initial biome
+  // Initial biome
   const [biome, setBiome] = useState<BiomeData>(() => generateMockBiome())
   const [mode, setMode] = useState<'fly' | 'walk'>('fly')
+  const [isGenerating, setIsGenerating] = useState(false);
+  const isGeneratingRef = useRef(false);
+  const [loadingStep, setLoadingStep] = useState("");
+
+  const handleRegenerate = async () => {
+    if (isGeneratingRef.current) return;
+    isGeneratingRef.current = true;
+    setIsGenerating(true);
+
+    try {
+      // 1. Params
+      setLoadingStep("Calculating Orbital Parameters...");
+      const params = generateRandomParameters();
+
+      // 2. Description (Gemini Pro)
+      setLoadingStep("Consulting Xenobiologist (Gemini 3 Pro)...");
+      const description = await generateBiomeDescription(params);
+
+      // 3. Data (Gemini Flash)
+      setLoadingStep("Simulating Terrain Physics (Gemini 3 Flash)...");
+      const newBiome = await generateBiomeData(description, params);
+
+      setBiome(newBiome);
+    } catch (e) {
+      console.error(e);
+      alert("Failed to generate biome. Check console and API Key.");
+    } finally {
+      setIsGenerating(false);
+      isGeneratingRef.current = false;
+      setLoadingStep("");
+    }
+  };
 
   // Leva controls for quick regeneration
   useControls({
     'Regenerate World': button(() => {
-      setBiome(generateMockBiome())
+      handleRegenerate();
     }),
     'Mode': {
       options: { 'Fly Mode': 'fly', 'Walk Mode': 'walk' },
@@ -76,9 +110,28 @@ function App() {
         <h1 style={{ margin: 0, textTransform: 'uppercase', fontSize: '2rem' }}>VIBECODE // {biome.name}</h1>
         <p style={{ margin: '0.5rem 0', opacity: 0.8, maxWidth: '400px' }}>{biome.description}</p>
         <div style={{ marginTop: '1rem', fontSize: '0.8rem', opacity: 0.6 }}>
-          HEIGHT: {biome.terrain.heightScale.toFixed(1)} | ROUGHNESS: {biome.terrain.roughness.toFixed(2)}
+          LAYERS: {biome.terrain.layers.length} | GRAVITY: {biome.parameters.gravity}G
         </div>
       </div>
+
+      {/* Loading Overlay */}
+      {isGenerating && (
+        <div style={{
+          position: 'absolute',
+          top: 0, left: 0, width: '100%', height: '100%',
+          background: 'rgba(0,0,0,0.8)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100,
+          color: '#00ffff',
+          fontFamily: "'Courier New', Courier, monospace",
+        }}>
+          <h2 style={{ textTransform: 'uppercase', letterSpacing: '2px' }}>Generating New World</h2>
+          <p>{loadingStep}</p>
+        </div>
+      )}
 
       <Leva theme={{ colors: { highlight1: '#ff00ff', highlight2: '#00ffff' } }} />
 
