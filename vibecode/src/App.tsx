@@ -1,23 +1,55 @@
-import { useRef, useState } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { Stars } from '@react-three/drei'
+import React, { useRef, useState, useEffect } from 'react'
+import { Canvas, useThree } from '@react-three/fiber'
+import { Stars, useTexture, Environment } from '@react-three/drei'
 import { Leva, useControls, button } from 'leva'
 import { ChunkManager } from './components/ChunkManager'
 import { generateMockBiome } from './utils/mockGenerator'
 import type { BiomeData } from './types/biome'
 import { PlayerControls } from './components/PlayerControls'
-import { Group } from 'three'
-import { generateRandomParameters, generateBiomeDescription, generateBiomeData, generateBiomeTexture } from './services/ai'
+import { Group, BackSide } from 'three'
+import * as THREE from 'three'
+import { generateRandomParameters, generateBiomeDescription, generateBiomeData, generateBiomeTexture, generateSkyboxTexture } from './services/ai'
+
+function Skybox({ url }: { url: string }) {
+  const { scene } = useThree();
+  const texture = useTexture(url);
+
+  useEffect(() => {
+    // Apply texture to background
+    const oldBg = scene.background;
+    texture.mapping = THREE.EquirectangularReflectionMapping;
+    scene.background = texture;
+
+    return () => {
+      scene.background = oldBg;
+    }
+  }, [texture, scene]);
+
+  return null; // The texture is applied to the scene background, no mesh needed if we assume it's a skybox
+}
 
 function Scene({ biome, mode }: { biome: BiomeData, mode: 'fly' | 'walk' }) {
   const terrainRef = useRef<Group>(null);
 
-  // We use the primitive fogExp2 for realistic distance falloff
   return (
     <>
-      <color attach="background" args={[biome.atmosphere.skyColor]} />
-      {/* Reduced fog density for longer view distance */}
-      <fogExp2 attach="fog" args={[biome.atmosphere.fogColor, biome.atmosphere.fogDensity * 0.5]} />
+      {/* Fallback Stars if no skybox */}
+      {!biome.atmosphere.skyboxUrl && (
+        <>
+          <color attach="background" args={[biome.atmosphere.skyColor]} />
+          <Stars radius={150} depth={50} count={7000} factor={4} saturation={0} fade speed={0.5} />
+        </>
+      )}
+
+      {/* Skybox if URL exists */}
+      {biome.atmosphere.skyboxUrl && (
+        <React.Suspense fallback={<Stars radius={150} depth={50} count={7000} factor={4} saturation={0} fade speed={0.5} />}>
+          <Skybox url={biome.atmosphere.skyboxUrl} />
+        </React.Suspense>
+      )}
+
+      {/* Fog - reduce density if we have a skybox to see it? */}
+      <fogExp2 attach="fog" args={[biome.atmosphere.fogColor, biome.atmosphere.fogDensity * (biome.atmosphere.skyboxUrl ? 0.2 : 0.5)]} />
 
       <ambientLight intensity={0.2} />
       <directionalLight
@@ -36,7 +68,9 @@ function Scene({ biome, mode }: { biome: BiomeData, mode: 'fly' | 'walk' }) {
         <meshBasicMaterial color="red" wireframe />
       </mesh>
 
-      <Stars radius={150} depth={50} count={7000} factor={4} saturation={0} fade speed={0.5} />
+      <React.Suspense fallback={null}>
+        {biome.atmosphere.skyboxUrl && <Skybox url={biome.atmosphere.skyboxUrl} />}
+      </React.Suspense>
 
       {/* Unified Controls for both modes */}
       <PlayerControls mode={mode} terrainMesh={terrainRef} />
@@ -71,16 +105,26 @@ function App() {
       setLoadingStep("Simulating Terrain Physics (Gemini 3 Flash)...");
       const newBiomeData = await generateBiomeData(description, params);
 
-      // 4. Texture (Nano Banana)
+      // 4. Texture (Flux)
       setLoadingStep("Synthesizing Nano-Textures...");
       try {
-        // We don't want to crash if texture fails, just warn
         const textureUrl = await generateBiomeTexture(description);
         if (textureUrl) {
           newBiomeData.terrain.textureUrl = textureUrl;
         }
       } catch (err) {
         console.warn("Texture gen failed, continuing", err);
+      }
+
+      // 5. Skybox (Flux)
+      setLoadingStep("Painting The Heavens...");
+      try {
+        const skyUrl = await generateSkyboxTexture(description);
+        if (skyUrl) {
+          newBiomeData.atmosphere.skyboxUrl = skyUrl;
+        }
+      } catch (err) {
+        console.warn("Skybox gen failed", err);
       }
 
       setBiome(newBiomeData);
@@ -118,7 +162,7 @@ function App() {
         pointerEvents: 'none',
         textShadow: '0px 0px 4px rgba(0,0,0,0.8)'
       }}>
-        <h1 style={{ margin: 0, textTransform: 'uppercase', fontSize: '2rem' }}>VIBECODE // {biome.name}</h1>
+        <h1 style={{ margin: 0, textTransform: 'uppercase', fontSize: '2rem' }}>{biome.name}</h1>
         <p style={{ margin: '0.5rem 0', opacity: 0.8, maxWidth: '400px' }}>{biome.description}</p>
         <div style={{ marginTop: '1rem', fontSize: '0.8rem', opacity: 0.6 }}>
           LAYERS: {biome.terrain.layers.length} | GRAVITY: {biome.parameters.gravity}G

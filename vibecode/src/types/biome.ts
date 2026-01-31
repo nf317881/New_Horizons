@@ -20,6 +20,7 @@ export interface AtmosphereParams {
   fogColor: string;
   fogDensity: number;
   sunIntensity: number;
+  skyboxUrl?: string;
 }
 
 // The "Scientific" parameters that feed the AI

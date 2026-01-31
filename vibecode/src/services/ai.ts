@@ -37,7 +37,7 @@ export const generateBiomeDescription = async (params: BiomeParameters): Promise
     - Gravity: ${params.gravity}G
     - Atmosphere: ${params.atmosphereDensity}
     
-    Describe the terrain, colors, flora, and general "vibe". Be creative but scientific. Keep it under 50 words.
+    Describe the terrain, colors, flora, and general "vibe". Be creative but scientific. Keep it under 50 words. Use only simple text, not markdown or other formatting.
     `;
 
     const response = await fetch(OPENROUTER_API_URL, {
@@ -139,7 +139,7 @@ export const generateBiomeTexture = async (description: string): Promise<string>
     const apiKey = getApiKey();
     const model = "black-forest-labs/flux.2-klein-4b";
     const isGemini = model.includes("gemini");
-    const prompt = `Seamless top-down terrain texture of ${description}. Only generate the ground texture, not plants or other features. High resolution, realistic, PBR style.`;
+    const prompt = `Seamless top-down texture of ${description}. Pure ground surface material only. No plants, no trees, no objects. Uniform patterns. High resolution, realistic, PBR compatible.`;
 
     // Updated based on OpenRouter Docs: Use /chat/completions for multimodal generation
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -199,5 +199,51 @@ export const generateBiomeTexture = async (description: string): Promise<string>
     }
 
     console.warn("Texture Generation: No image found in response", data);
+    return "";
+};
+
+// 5. Generate Skybox using Flux
+export const generateSkyboxTexture = async (description: string): Promise<string> => {
+    const apiKey = getApiKey();
+    const model = "black-forest-labs/flux.2-klein-4b";
+    const isGemini = model.includes("gemini");
+    const prompt = `Equirectangular skybox texture of ${description}. sky only, panoramic, high resolution, realistic, seamless.`;
+
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "http://localhost:5173",
+            "X-Title": "Vibecode"
+        },
+        body: JSON.stringify({
+            model: model,
+            messages: [{ role: "user", content: prompt }],
+            ...(isGemini ? { modalities: ["image", "text"] } : {}),
+        })
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.warn("Skybox Generation Failed:", response.status, errorText);
+        return "";
+    }
+
+    const data = await response.json();
+    const message = data.choices?.[0]?.message;
+
+    if (message) {
+        if (message.images && message.images.length > 0) {
+            return message.images[0].image_url?.url || message.images[0].url || "";
+        }
+        if (message.content) {
+            const mdMatch = message.content.match(/!\[.*?\]\((.*?)\)/);
+            if (mdMatch) return mdMatch[1];
+            const urlMatch = message.content.match(/https?:\/\/[^\s)]+/);
+            if (urlMatch) return urlMatch[0];
+        }
+    }
+
     return "";
 };

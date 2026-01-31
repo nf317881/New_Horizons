@@ -29,7 +29,7 @@ const TerrainMaterialWithTexture = ({ url }: { url: string }) => {
     const texture = useTexture(url);
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(4, 4);
+    texture.repeat.set(8, 8);
 
     // Tint with vertex colors? 
     // Temporarily disabled vertexColors to debug texture mapping
