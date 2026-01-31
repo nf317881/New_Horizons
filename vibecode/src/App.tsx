@@ -1,12 +1,12 @@
 import React, { useRef, useState, useEffect } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
-import { Stars, useTexture, Environment } from '@react-three/drei'
+import { Stars, useTexture } from '@react-three/drei'
 import { Leva, useControls, button } from 'leva'
 import { ChunkManager } from './components/ChunkManager'
 import { generateMockBiome } from './utils/mockGenerator'
 import type { BiomeData } from './types/biome'
 import { PlayerControls } from './components/PlayerControls'
-import { Group, BackSide } from 'three'
+import { Group } from 'three'
 import * as THREE from 'three'
 import { generateRandomParameters, generateBiomeDescription, generateBiomeData, generateBiomeTexture, generateSkyboxTexture } from './services/ai'
 
@@ -68,9 +68,7 @@ function Scene({ biome, mode }: { biome: BiomeData, mode: 'fly' | 'walk' }) {
         <meshBasicMaterial color="red" wireframe />
       </mesh>
 
-      <React.Suspense fallback={null}>
-        {biome.atmosphere.skyboxUrl && <Skybox url={biome.atmosphere.skyboxUrl} />}
-      </React.Suspense>
+
 
       {/* Unified Controls for both modes */}
       <PlayerControls mode={mode} terrainMesh={terrainRef} />
@@ -99,16 +97,23 @@ function App() {
 
       // 2. Description (Gemini Pro)
       setLoadingStep("Consulting Xenobiologist (Gemini 3 Pro)...");
-      const description = await generateBiomeDescription(params);
+      // 2. Description (Gemini Pro)
+      setLoadingStep("Consulting Xenobiologist (Gemini 3 Pro)...");
+      const detailedDesc = await generateBiomeDescription(params);
+
+      // Update params with detailed info
+      params.description = detailedDesc.summary;
+      params.groundDescription = detailedDesc.ground;
+      params.skyDescription = detailedDesc.sky;
 
       // 3. Data (Gemini Flash)
       setLoadingStep("Simulating Terrain Physics (Gemini 3 Flash)...");
-      const newBiomeData = await generateBiomeData(description, params);
+      const newBiomeData = await generateBiomeData(detailedDesc.summary, params);
 
       // 4. Texture (Flux)
       setLoadingStep("Synthesizing Nano-Textures...");
       try {
-        const textureUrl = await generateBiomeTexture(description);
+        const textureUrl = await generateBiomeTexture(detailedDesc.ground || detailedDesc.summary);
         if (textureUrl) {
           newBiomeData.terrain.textureUrl = textureUrl;
         }
@@ -119,7 +124,7 @@ function App() {
       // 5. Skybox (Flux)
       setLoadingStep("Painting The Heavens...");
       try {
-        const skyUrl = await generateSkyboxTexture(description);
+        const skyUrl = await generateSkyboxTexture(detailedDesc.sky || detailedDesc.summary);
         if (skyUrl) {
           newBiomeData.atmosphere.skyboxUrl = skyUrl;
         }

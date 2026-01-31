@@ -8,7 +8,9 @@ export const generateMockBiome = (): BiomeData => {
             temperature: 20,
             gravity: 1,
             atmosphereDensity: "Standard",
-            description: "Mock data"
+            description: "Mock data",
+            groundDescription: "rocky moss",
+            skyDescription: "clear blue sky"
         },
         terrain: {
             baseColor: '#2d4c1e',

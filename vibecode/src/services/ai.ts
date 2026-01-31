@@ -22,12 +22,20 @@ export const generateRandomParameters = (): BiomeParameters => {
         temperature: Math.floor(Math.random() * 150) - 50, // -50 to 100
         gravity: parseFloat((Math.random() * 1.9 + 0.1).toFixed(2)), // 0.1 to 2.0
         atmosphereDensity: ["Thin", "Standard", "Thick", "Soupy"][Math.floor(Math.random() * 4)],
-        description: "", // Filled by AI
+        description: "",
+        groundDescription: "",
+        skyDescription: "",
     };
 };
 
+export interface DetailedDescription {
+    summary: string;
+    ground: string;
+    sky: string;
+}
+
 // 2. Call "Gemini Pro" (using OpenRouter ID) for Creative Description
-export const generateBiomeDescription = async (params: BiomeParameters): Promise<string> => {
+export const generateBiomeDescription = async (params: BiomeParameters): Promise<DetailedDescription> => {
     const apiKey = getApiKey();
     if (!apiKey) throw new Error("Missing API Key. Please set VITE_OPENROUTER_GEMINI_KEY in .env");
 
@@ -37,7 +45,12 @@ export const generateBiomeDescription = async (params: BiomeParameters): Promise
     - Gravity: ${params.gravity}G
     - Atmosphere: ${params.atmosphereDensity}
     
-    Describe the terrain, colors, flora, and general "vibe". Be creative but scientific. Keep it under 50 words. Use only simple text, not markdown or other formatting.
+    Output MUST be valid JSON with these fields:
+    - summary: A creative narrative description (max 50 words).
+    - ground: A short prompt for the ground texture. BE SPECIFIC about material (rock, sand, crystal). NO PLANTS.
+    - sky: A short prompt for the skybox. Mention colors, moons, or clouds. NO PLANTS.
+
+    Example: {"summary": "A frozen wasteland...", "ground": "cracked blue ice with silver veins", "sky": "black sky with two green moons"}
     `;
 
     const response = await fetch(OPENROUTER_API_URL, {
@@ -54,7 +67,9 @@ export const generateBiomeDescription = async (params: BiomeParameters): Promise
 
     if (!response.ok) throw new Error(`AI Request Failed: ${response.statusText}`);
     const data: OpenRouterResponse = await response.json();
-    return data.choices[0].message.content;
+    let content = data.choices[0].message.content;
+    content = content.replace(/```json/g, '').replace(/```/g, '');
+    return JSON.parse(content) as DetailedDescription;
 };
 
 // 3. Call "Gemini Flash" for Structured Data Generation
@@ -139,7 +154,7 @@ export const generateBiomeTexture = async (description: string): Promise<string>
     const apiKey = getApiKey();
     const model = "black-forest-labs/flux.2-klein-4b";
     const isGemini = model.includes("gemini");
-    const prompt = `Seamless top-down texture of ${description}. Pure ground surface material only. No plants, no trees, no objects. Uniform patterns. High resolution, realistic, PBR compatible.`;
+    const prompt = `Seamless repeatable top-down texture of ${description}. NO PLANTS, NO TREES, NO GRASS. Only raw ground material (e.g. ${description}). High resolution, detailed, photorealistic, PBR style.`;
 
     // Updated based on OpenRouter Docs: Use /chat/completions for multimodal generation
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -207,7 +222,8 @@ export const generateSkyboxTexture = async (description: string): Promise<string
     const apiKey = getApiKey();
     const model = "black-forest-labs/flux.2-klein-4b";
     const isGemini = model.includes("gemini");
-    const prompt = `Equirectangular skybox texture of ${description}. sky only, panoramic, high resolution, realistic, seamless.`;
+    // To minimize seams, we explicitly ask for equirectangular 360 panorama and mention no foreground objects.
+    const prompt = `Seamless 360-degree equirectangular panoramic skybox of ${description}. SKY ONLY. Panoramic view, no ground, no plants, no foreground objects. Perfect horizontal tiling. High resolution, cosmic, realistic.`;
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",

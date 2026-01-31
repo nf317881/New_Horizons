@@ -29,11 +29,57 @@ const TerrainMaterialWithTexture = ({ url }: { url: string }) => {
     const texture = useTexture(url);
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(8, 8);
 
-    // Tint with vertex colors? 
-    // Temporarily disabled vertexColors to debug texture mapping
-    return <meshStandardMaterial map={texture} roughness={0.8} metalness={0.2} side={THREE.DoubleSide} />;
+    // Scale for triplanar mapping (repeats per world unit)
+    const triplanarScale = 0.08;
+
+    const onBeforeCompile = (shader: any) => {
+        shader.uniforms.triplanarScale = { value: triplanarScale };
+
+        shader.vertexShader = `
+            varying vec3 vWorldPos;
+            varying vec3 vWorldNormal;
+            ${shader.vertexShader}
+        `.replace(
+            '#include <worldpos_vertex>',
+            `#include <worldpos_vertex>
+            vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+            vWorldNormal = normalize(modelMatrix * vec4(normal, 0.0)).xyz;`
+        );
+
+        shader.fragmentShader = `
+            varying vec3 vWorldPos;
+            varying vec3 vWorldNormal;
+            uniform float triplanarScale;
+            ${shader.fragmentShader}
+        `.replace(
+            '#include <map_fragment>',
+            `
+            vec3 blending = abs(vWorldNormal);
+            blending /= (blending.x + blending.y + blending.z);
+            
+            vec2 xUV = vWorldPos.yz * triplanarScale;
+            vec2 yUV = vWorldPos.xz * triplanarScale;
+            vec2 zUV = vWorldPos.xy * triplanarScale;
+
+            vec4 xColor = texture2D(map, xUV);
+            vec4 yColor = texture2D(map, yUV);
+            vec4 zColor = texture2D(map, zUV);
+
+            diffuseColor *= xColor * blending.x + yColor * blending.y + zColor * blending.z;
+            `
+        );
+    };
+
+    return (
+        <meshStandardMaterial
+            map={texture}
+            onBeforeCompile={onBeforeCompile}
+            roughness={0.8}
+            metalness={0.2}
+            side={THREE.DoubleSide}
+        />
+    );
 }
 
 export const Terrain = forwardRef<THREE.Mesh, TerrainProps>(({ data, chunkX = 0, chunkZ = 0, noise2D }, ref) => {

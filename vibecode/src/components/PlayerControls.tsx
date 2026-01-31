@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import { PointerLockControls } from '@react-three/drei';
+import * as THREE from 'three';
 import { Group, Vector3, Raycaster } from 'three';
 
 interface PlayerControlsProps {
@@ -194,7 +195,18 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ mode, terrainMes
         }
     });
 
+    const lightRef = useRef<THREE.PointLight>(null);
+
+    useFrame(() => {
+        if (lightRef.current) {
+            lightRef.current.position.copy(camera.position);
+        }
+    });
+
     return (
-        <PointerLockControls ref={controlsRef} />
+        <>
+            <PointerLockControls ref={controlsRef} />
+            <pointLight ref={lightRef} intensity={5.0} distance={50} color="white" />
+        </>
     );
 };

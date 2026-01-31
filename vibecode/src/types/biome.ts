@@ -28,7 +28,9 @@ export interface BiomeParameters {
   temperature: number; // -50 to 100 Celsius
   gravity: number; // 0.1 to 2.0 G relative to Earth
   atmosphereDensity: string; // "Thin", "Standard", "Thick"
-  description: string; // Short generated prompt
+  description: string; // Master narrative
+  groundDescription: string; // Specific for terrain texture
+  skyDescription: string; // Specific for skybox
 }
 
 export interface BiomeData {
