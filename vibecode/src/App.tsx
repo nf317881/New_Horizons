@@ -1,17 +1,22 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Stars } from '@react-three/drei'
+import { Stars } from '@react-three/drei'
 import { Leva, useControls, button } from 'leva'
-import { Terrain } from './components/Terrain'
+import { ChunkManager } from './components/ChunkManager'
 import { generateMockBiome } from './utils/mockGenerator'
 import type { BiomeData } from './types/biome'
+import { PlayerControls } from './components/PlayerControls'
+import { Group } from 'three'
 
-function Scene({ biome }: { biome: BiomeData }) {
+function Scene({ biome, mode }: { biome: BiomeData, mode: 'fly' | 'walk' }) {
+  const terrainRef = useRef<Group>(null);
+
   // We use the primitive fogExp2 for realistic distance falloff
   return (
     <>
       <color attach="background" args={[biome.atmosphere.skyColor]} />
-      <fogExp2 attach="fog" args={[biome.atmosphere.fogColor, biome.atmosphere.fogDensity]} />
+      {/* Reduced fog density for longer view distance */}
+      <fogExp2 attach="fog" args={[biome.atmosphere.fogColor, biome.atmosphere.fogDensity * 0.5]} />
 
       <ambientLight intensity={0.2} />
       <directionalLight
@@ -21,7 +26,8 @@ function Scene({ biome }: { biome: BiomeData }) {
         shadow-mapSize={[2048, 2048]}
       />
 
-      <Terrain data={biome.terrain} />
+      {/* Dynamic Chunks */}
+      <ChunkManager ref={terrainRef} biome={biome} />
 
       {/* Debug Box to confirm scene renders */}
       <mesh position={[0, 10, 0]}>
@@ -30,7 +36,9 @@ function Scene({ biome }: { biome: BiomeData }) {
       </mesh>
 
       <Stars radius={150} depth={50} count={7000} factor={4} saturation={0} fade speed={0.5} />
-      <OrbitControls makeDefault minDistance={10} maxDistance={100} />
+
+      {/* Unified Controls for both modes */}
+      <PlayerControls mode={mode} terrainMesh={terrainRef} />
     </>
   )
 }
@@ -39,12 +47,17 @@ function App() {
   console.log("App Rendering...");
   // Initial biome
   const [biome, setBiome] = useState<BiomeData>(() => generateMockBiome())
+  const [mode, setMode] = useState<'fly' | 'walk'>('fly')
 
   // Leva controls for quick regeneration
   useControls({
     'Regenerate World': button(() => {
       setBiome(generateMockBiome())
     }),
+    'Mode': {
+      options: { 'Fly Mode': 'fly', 'Walk Mode': 'walk' },
+      onChange: (v: string) => setMode(v as 'fly' | 'walk')
+    }
   })
 
   return (
@@ -69,8 +82,8 @@ function App() {
 
       <Leva theme={{ colors: { highlight1: '#ff00ff', highlight2: '#00ffff' } }} />
 
-      <Canvas shadows camera={{ position: [0, 30, 60], fov: 45 }}>
-        <Scene biome={biome} />
+      <Canvas shadows camera={{ position: [0, 5, 10], fov: 60 }}>
+        <Scene biome={biome} mode={mode} />
       </Canvas>
     </div>
   )

@@ -7,7 +7,7 @@ export const generateMockBiome = (): BiomeData => {
             name: "Neon Tundra",
             description: "A frozen wasteland illuminated by radioactive flora.",
             terrain: {
-                heightScale: 12,
+                heightScale: 4, // Reduced from 12
                 noiseScale: 0.04,
                 roughness: 0.6,
                 waterLevel: 0,
@@ -25,7 +25,7 @@ export const generateMockBiome = (): BiomeData => {
             name: "Crimson Wastes",
             description: "A scorched desert with jagged iron peaks.",
             terrain: {
-                heightScale: 8,
+                heightScale: 3, // Reduced from 8
                 noiseScale: 0.03,
                 roughness: 0.4,
                 waterLevel: -10,
@@ -43,7 +43,7 @@ export const generateMockBiome = (): BiomeData => {
             name: "Mossy Archipelago",
             description: "Floating islands covered in alien moss.",
             terrain: {
-                heightScale: 20,
+                heightScale: 6, // Reduced from 20
                 noiseScale: 0.02,
                 roughness: 0.2,
                 waterLevel: 5,
@@ -63,6 +63,10 @@ export const generateMockBiome = (): BiomeData => {
 
     return {
         id: uuidv4(),
-        ...style
+        ...style,
+        terrain: {
+            ...style.terrain,
+            seed: Math.random() * 10000 // Random seed for this instance
+        }
     };
 };

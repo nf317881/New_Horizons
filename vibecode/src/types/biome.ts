@@ -5,6 +5,7 @@ export interface TerrainRules {
   waterLevel: number;
   baseColor: string;
   highColor: string;
+  seed: number; // Added seed for consistent noise generation
 }
 
 export interface AtmosphereRules {
@@ -22,5 +23,4 @@ export interface BiomeData {
   atmosphere: AtmosphereRules;
 }
 
-// Add a runtime export to ensure the module is not empty
 export const DEFAULT_BIOME_ID = "default";
