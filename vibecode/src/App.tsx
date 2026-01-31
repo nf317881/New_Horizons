@@ -28,7 +28,7 @@ function Skybox({ url }: { url: string }) {
   return null; // The texture is applied to the scene background, no mesh needed if we assume it's a skybox
 }
 
-function Scene({ biome, mode }: { biome: BiomeData, mode: 'fly' | 'walk' }) {
+function Scene({ biome, mode, setMode }: { biome: BiomeData, mode: 'fly' | 'walk', setMode: React.Dispatch<React.SetStateAction<'fly' | 'walk'>> }) {
   const terrainRef = useRef<Group>(null);
 
   return (
@@ -71,7 +71,12 @@ function Scene({ biome, mode }: { biome: BiomeData, mode: 'fly' | 'walk' }) {
 
 
       {/* Unified Controls for both modes */}
-      <PlayerControls mode={mode} terrainMesh={terrainRef} />
+      <PlayerControls
+        mode={mode}
+        onToggleMode={() => setMode(prev => prev === 'fly' ? 'walk' : 'fly')}
+        gravityMult={biome.parameters.gravity}
+        terrainMesh={terrainRef}
+      />
     </>
   )
 }
@@ -196,7 +201,7 @@ function App() {
       <Leva theme={{ colors: { highlight1: '#ff00ff', highlight2: '#00ffff' } }} />
 
       <Canvas shadows camera={{ position: [0, 5, 10], fov: 60 }}>
-        <Scene biome={biome} mode={mode} />
+        <Scene biome={biome} mode={mode} setMode={setMode} />
       </Canvas>
     </div>
   )

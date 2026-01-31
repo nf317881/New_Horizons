@@ -92,16 +92,16 @@ export const generateBiomeData = async (description: string, params: BiomeParame
             "waterLevel": number (-10 to 10),
             "layers": [
                 {
-                    "name": "Base Layer",
-                    "noiseScale": number (0.005 to 0.03),
-                    "heightScale": number (5 to 50),
-                    "roughness": number (0 to 1),
+                    "name": "Base Layer (Large features)",
+                    "noiseScale": number (0.002 to 0.01),
+                    "heightScale": number (5 to 40),
+                    "roughness": number (0 to 0.5),
                     "offsetX": 0,
                     "offsetZ": 0
                 },
                 {
-                    "name": "Detail Layer",
-                    "noiseScale": number (0.04 to 0.1),
+                    "name": "Detail Layer (Small bumps)",
+                    "noiseScale": number (0.02 to 0.05),
                     "heightScale": number (1 to 5),
                     "roughness": number (0 to 1),
                     "offsetX": 0,
@@ -117,7 +117,10 @@ export const generateBiomeData = async (description: string, params: BiomeParame
         }
     }
     
-    Return ONLY JSON. No formatting blocks.
+    CRITICAL PHYSICS RULES:
+    1. TRAVERSABILITY: The terrain MUST be walkable. Avoid combinations of high noiseScale (>0.02) and high heightScale (>10) which create impenetrable spikes.
+    2. COHERENCE: If you want big mountains, use low noiseScale (<0.005). If you want rocky detail, use low heightScale (<3).
+    3. Return ONLY JSON. No formatting blocks.
     `;
 
     const response = await fetch(OPENROUTER_API_URL, {
