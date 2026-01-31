@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import type { BiomeData } from '../types/biome';
 
 import type { NoiseFunction2D } from 'simplex-noise';
+import { getTerrainHeight } from '../utils/terrainUtils';
 
 interface TerrainProps {
     data: BiomeData['terrain'];
@@ -39,34 +40,8 @@ export const Terrain = forwardRef<THREE.Mesh, TerrainProps>(({ data, chunkX = 0,
             // We want continuous noise, so we map NoiseY to WorldZ.
             const globalY = noiseOffsetY - localY;
 
-            // --- Multi-Layer Noise Calculation ---
-            let totalNoise = 0;
-
-            // Iterate through multiple layers defined by AI
-            if (data.layers && data.layers.length > 0) {
-                for (const layer of data.layers) {
-                    // Base layer noise
-                    let n = noise2D(
-                        (globalX + layer.offsetX) * layer.noiseScale,
-                        (globalY + layer.offsetZ) * layer.noiseScale
-                    );
-
-                    // Add roughness (simple fractal detail within the layer)
-                    // We can also just treating layers as the octaves themselves, 
-                    // but adding a little detail per layer looks nice.
-                    if (layer.roughness > 0) {
-                        n += 0.5 * layer.roughness * noise2D(
-                            (globalX + layer.offsetX) * layer.noiseScale * 2,
-                            (globalY + layer.offsetZ) * layer.noiseScale * 2
-                        );
-                    }
-
-                    totalNoise += n * layer.heightScale;
-                }
-            } else {
-                // Fallback if no layers
-                totalNoise = noise2D(globalX * 0.02, globalY * 0.02) * 5;
-            }
+            // Base layer noise
+            const totalNoise = getTerrainHeight(globalX, globalY, data.layers, noise2D);
 
             // Apply Height
             // Normalize slightly to prevent extreme spikes if many layers add up?
