@@ -47,7 +47,7 @@ export const generateBiomeDescription = async (params: BiomeParameters): Promise
             "Content-Type": "application/json"
         },
         body: JSON.stringify({
-            model: "google/gemini-3-pro-preview",
+            model: "google/gemini-3-flash-preview",
             messages: [{ role: "user", content: prompt }]
         })
     });
@@ -133,4 +133,71 @@ export const generateBiomeData = async (description: string, params: BiomeParame
         terrain: parsedContext.terrain,
         atmosphere: parsedContext.atmosphere
     };
+};
+// 4. Generate Texture using "Nano Banana" (Gemini 2.5 Flash Image via OpenRouter)
+export const generateBiomeTexture = async (description: string): Promise<string> => {
+    const apiKey = getApiKey();
+    const model = "black-forest-labs/flux.2-klein-4b";
+    const isGemini = model.includes("gemini");
+    const prompt = `Seamless top-down terrain texture of ${description}. Only generate the ground texture, not plants or other features. High resolution, realistic, PBR style.`;
+
+    // Updated based on OpenRouter Docs: Use /chat/completions for multimodal generation
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "http://localhost:5173",
+            "X-Title": "Vibecode"
+        },
+        body: JSON.stringify({
+            model: model,
+            messages: [{ role: "user", content: prompt }],
+            // Gemini requires explicit modalities. Others (like Flux) might strict fail if "text" is requested but not supported.
+            ...(isGemini ? { modalities: ["image", "text"] } : {}),
+        })
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.warn("Texture Generation Failed:", response.status, errorText);
+        return "";
+    }
+
+    const data = await response.json();
+
+    // Detailed logging for debugging
+    console.log("[AI] Texture Gen Response Choices:", JSON.stringify(data.choices, null, 2));
+
+    const message = data.choices?.[0]?.message;
+
+    if (message) {
+        // 1. Try OpenRouter/OpenAI "images" array (non-standard but possible)
+        if (message.images && message.images.length > 0) {
+            const imgObj = message.images[0];
+            const url = imgObj.image_url?.url || imgObj.url || "";
+            console.log("[AI] Found URL in message.images:", url);
+            return url;
+        }
+
+        // 2. Try parsing Markdown image from content: ![alt](url)
+        if (message.content) {
+            const mdMatch = message.content.match(/!\[.*?\]\((.*?)\)/);
+            if (mdMatch) {
+                console.log("[AI] Found URL in message.content (Markdown):", mdMatch[1]);
+                return mdMatch[1];
+            }
+
+            // 3. Try finding a raw URL in the content
+            // We ignore parentheses at the end to avoid matching markdown closing parens if regex failed
+            const urlMatch = message.content.match(/https?:\/\/[^\s)]+/);
+            if (urlMatch) {
+                console.log("[AI] Found URL in message.content (Raw):", urlMatch[0]);
+                return urlMatch[0];
+            }
+        }
+    }
+
+    console.warn("Texture Generation: No image found in response", data);
+    return "";
 };

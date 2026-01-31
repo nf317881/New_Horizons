@@ -7,7 +7,7 @@ import { generateMockBiome } from './utils/mockGenerator'
 import type { BiomeData } from './types/biome'
 import { PlayerControls } from './components/PlayerControls'
 import { Group } from 'three'
-import { generateRandomParameters, generateBiomeDescription, generateBiomeData } from './services/ai'
+import { generateRandomParameters, generateBiomeDescription, generateBiomeData, generateBiomeTexture } from './services/ai'
 
 function Scene({ biome, mode }: { biome: BiomeData, mode: 'fly' | 'walk' }) {
   const terrainRef = useRef<Group>(null);
@@ -47,7 +47,6 @@ function Scene({ biome, mode }: { biome: BiomeData, mode: 'fly' | 'walk' }) {
 function App() {
   console.log("App Rendering...");
   // Initial biome
-  // Initial biome
   const [biome, setBiome] = useState<BiomeData>(() => generateMockBiome())
   const [mode, setMode] = useState<'fly' | 'walk'>('fly')
   const [isGenerating, setIsGenerating] = useState(false);
@@ -70,9 +69,21 @@ function App() {
 
       // 3. Data (Gemini Flash)
       setLoadingStep("Simulating Terrain Physics (Gemini 3 Flash)...");
-      const newBiome = await generateBiomeData(description, params);
+      const newBiomeData = await generateBiomeData(description, params);
 
-      setBiome(newBiome);
+      // 4. Texture (Nano Banana)
+      setLoadingStep("Synthesizing Nano-Textures...");
+      try {
+        // We don't want to crash if texture fails, just warn
+        const textureUrl = await generateBiomeTexture(description);
+        if (textureUrl) {
+          newBiomeData.terrain.textureUrl = textureUrl;
+        }
+      } catch (err) {
+        console.warn("Texture gen failed, continuing", err);
+      }
+
+      setBiome(newBiomeData);
     } catch (e) {
       console.error(e);
       alert("Failed to generate biome. Check console and API Key.");
@@ -143,3 +154,4 @@ function App() {
 }
 
 export default App
+
