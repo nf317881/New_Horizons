@@ -1,18 +1,23 @@
 import { useRef, useEffect } from 'react';
 import { useThree, useFrame } from '@react-three/fiber';
 import { PointerLockControls } from '@react-three/drei';
+import * as THREE from 'three';
 import { Group, Vector3, Raycaster } from 'three';
 
 interface PlayerControlsProps {
     mode: 'fly' | 'walk';
+    onToggleMode: () => void;
+    gravityMult: number;
     terrainMesh: React.RefObject<Group | null>;
 }
 
-export const PlayerControls: React.FC<PlayerControlsProps> = ({ mode, terrainMesh }) => {
-    const { camera } = useThree();
+export const PlayerControls: React.FC<PlayerControlsProps> = ({ mode, onToggleMode, gravityMult, terrainMesh }) => {
+    const { camera, gl } = useThree();
     const controlsRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
     const raycaster = useRef(new Raycaster());
     const downVector = new Vector3(0, -1, 0);
+
+    const lastSpaceTime = useRef(0);
 
     // Movement state
     const moveState = useRef({
@@ -35,11 +40,12 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ mode, terrainMes
     const RUN_SPEED = 30.0;
     const FLY_SPEED = 20.0;
     const FLY_FAST_SPEED = 60.0;
-    const GRAVITY = 30.0;
+    const BASE_GRAVITY = 30.0;
     const JUMP_FORCE = 15.0;
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.repeat) return;
             switch (event.code) {
                 case 'ArrowUp':
                 case 'KeyW': moveState.current.forward = true; break;
@@ -52,14 +58,19 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ mode, terrainMes
                 case 'ShiftLeft':
                 case 'ShiftRight': moveState.current.shift = true; break;
                 case 'Space':
-                    if (mode === 'fly') {
-                        moveState.current.up = true;
+                    if (event.repeat) return;
+                    const now = Date.now();
+                    const diff = now - lastSpaceTime.current;
+                    lastSpaceTime.current = now;
+
+                    if (diff < 300 && diff > 50) {
+                        onToggleMode();
+                        moveState.current.up = false;
+                        lastSpaceTime.current = 0;
                     } else {
-                        // Check if close enough to ground to jump (Coyote time / Tolerance)
-                        // Uses the last calculated ground check or simply heuristic
-                        // We can trust isGrounded, OR we can check if velocity is downward and we are close to ground.
-                        // Let's rely on isGrounded but make isGrounded stickier in useFrame.
-                        if (isGrounded.current) {
+                        if (mode === 'fly') {
+                            moveState.current.up = true;
+                        } else if (isGrounded.current) {
                             velocity.current.y = JUMP_FORCE;
                             isGrounded.current = false;
                         }
@@ -93,7 +104,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ mode, terrainMes
             document.removeEventListener('keydown', handleKeyDown);
             document.removeEventListener('keyup', handleKeyUp);
         };
-    }, [mode]);
+    }, [mode, onToggleMode]);
 
     useFrame((_, delta) => {
         if (!controlsRef.current?.isLocked) return;
@@ -123,14 +134,11 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ mode, terrainMes
                 camera.position.addScaledVector(moveVector, speed * delta);
             }
 
-            // Reset phsyics state
             velocity.current.set(0, 0, 0);
             isGrounded.current = false;
 
         } else {
             // --- WALK MODE ---
-
-            // 1. Horizontal Movement (XZ)
             const forward = new Vector3();
             camera.getWorldDirection(forward);
             forward.y = 0;
@@ -152,49 +160,52 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ mode, terrainMes
                 camera.position.addScaledVector(moveVector, speed * delta);
             }
 
-            // 2. Terrain Physics & Gravity
             let terrainHeight = -100;
-
             if (terrainMesh.current) {
                 raycaster.current.set(
                     new Vector3(camera.position.x, 1000, camera.position.z),
                     downVector
                 );
-
-                // Use recursive intersection for Groups
                 const intersects = raycaster.current.intersectObject(terrainMesh.current, true);
                 if (intersects.length > 0) {
                     terrainHeight = intersects[0].point.y;
                 }
             }
 
-            // Apply Gravity
-            velocity.current.y -= GRAVITY * delta;
-
-            // Apply Velocity
+            // Scale gravity by biome mult
+            const currentGravity = BASE_GRAVITY * gravityMult;
+            velocity.current.y -= currentGravity * delta;
             camera.position.y += velocity.current.y * delta;
 
-            // Ground Collision
             const groundY = terrainHeight + PLAYER_HEIGHT;
-
-            // Simple ground collision: if feet go below ground, snap up.
-            // "Feet" position is CameraY - PLAYER_HEIGHT.
-
-            // Tolerance for "snapping" to ground when walking down slopes
             const SNAP_TOLERANCE = 0.2;
 
-            if (camera.position.y <= groundY + SNAP_TOLERANCE && velocity.current.y <= 0) {
-                // Only snap if we are falling or level, not if jumping up
-                camera.position.y = groundY;
-                velocity.current.y = 0; // Stop falling
-                isGrounded.current = true;
+            // FIX: If we are below ground, always snap up. 
+            // Also stop falling if we hit the ground.
+            if (camera.position.y <= groundY + SNAP_TOLERANCE) {
+                if (velocity.current.y <= 0 || camera.position.y < groundY - 0.1) {
+                    camera.position.y = groundY;
+                    velocity.current.y = 0;
+                    isGrounded.current = true;
+                }
             } else {
                 isGrounded.current = false;
             }
         }
     });
 
+    const lightRef = useRef<THREE.PointLight>(null);
+
+    useFrame(() => {
+        if (lightRef.current) {
+            lightRef.current.position.copy(camera.position);
+        }
+    });
+
     return (
-        <PointerLockControls ref={controlsRef} />
+        <>
+            <PointerLockControls ref={controlsRef} domElement={gl.domElement} />
+            <pointLight ref={lightRef} intensity={5.0} distance={150} color="white" decay={1} />
+        </>
     );
 };

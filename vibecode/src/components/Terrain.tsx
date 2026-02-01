@@ -1,15 +1,86 @@
-import React, { useMemo, forwardRef } from 'react';
+import { useMemo, forwardRef, Suspense } from 'react';
 import * as THREE from 'three';
+import { useTexture } from '@react-three/drei';
 import type { BiomeData } from '../types/biome';
-
 import type { NoiseFunction2D } from 'simplex-noise';
 import { getTerrainHeight } from '../utils/terrainUtils';
 
 interface TerrainProps {
-    data: BiomeData['terrain'];
+    data: BiomeData['terrain'] & { textureUrl?: string };
     chunkX?: number;
     chunkZ?: number;
     noise2D: NoiseFunction2D;
+}
+
+
+
+// Component that safely wraps the material to avoid hook rules issues if we were to toggle URL on/off dynamically in same instance without remount
+const MaterialWrapper = ({ data }: { data: TerrainProps['data'] }) => {
+    if (data.textureUrl) {
+        return (
+            <Suspense fallback={<meshStandardMaterial wireframe color="gray" />}>
+                <TerrainMaterialWithTexture url={data.textureUrl} />
+            </Suspense>
+        )
+    }
+    return <meshStandardMaterial vertexColors roughness={0.8} metalness={0.2} side={THREE.DoubleSide} />;
+}
+
+const TerrainMaterialWithTexture = ({ url }: { url: string }) => {
+    const texture = useTexture(url);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+
+    // Scale for triplanar mapping (repeats per world unit)
+    const triplanarScale = 0.08;
+
+    const onBeforeCompile = (shader: any) => {
+        shader.uniforms.triplanarScale = { value: triplanarScale };
+
+        shader.vertexShader = `
+            varying vec3 vWorldPos;
+            varying vec3 vWorldNormal;
+            ${shader.vertexShader}
+        `.replace(
+            '#include <worldpos_vertex>',
+            `#include <worldpos_vertex>
+            vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+            vWorldNormal = normalize(modelMatrix * vec4(normal, 0.0)).xyz;`
+        );
+
+        shader.fragmentShader = `
+            varying vec3 vWorldPos;
+            varying vec3 vWorldNormal;
+            uniform float triplanarScale;
+            ${shader.fragmentShader}
+        `.replace(
+            '#include <map_fragment>',
+            `
+            vec3 blending = abs(vWorldNormal);
+            blending /= (blending.x + blending.y + blending.z);
+            
+            vec2 xUV = vWorldPos.yz * triplanarScale;
+            vec2 yUV = vWorldPos.xz * triplanarScale;
+            vec2 zUV = vWorldPos.xy * triplanarScale;
+
+            vec4 xColor = texture2D(map, xUV);
+            vec4 yColor = texture2D(map, yUV);
+            vec4 zColor = texture2D(map, zUV);
+
+            diffuseColor *= xColor * blending.x + yColor * blending.y + zColor * blending.z;
+            `
+        );
+    };
+
+    return (
+        <meshStandardMaterial
+            map={texture}
+            onBeforeCompile={onBeforeCompile}
+            roughness={0.8}
+            metalness={0.2}
+            side={THREE.DoubleSide}
+        />
+    );
 }
 
 export const Terrain = forwardRef<THREE.Mesh, TerrainProps>(({ data, chunkX = 0, chunkZ = 0, noise2D }, ref) => {
@@ -34,26 +105,38 @@ export const Terrain = forwardRef<THREE.Mesh, TerrainProps>(({ data, chunkX = 0,
             const localY = posAttribute.getY(i);
 
             const globalX = noiseOffsetX + localX;
-            // IMPORTANT: Plane was rotated -90deg on X.
+            // Plane was rotated -90deg on X.
             // +LocalY points to World -Z.
-            // So WorldZ = ChunkZ - LocalY.
-            // We want continuous noise, so we map NoiseY to WorldZ.
             const globalY = noiseOffsetY - localY;
 
-            // Base layer noise
-            const totalNoise = getTerrainHeight(globalX, globalY, data.layers, noise2D);
+            // --- Multi-Layer Noise Calculation ---
+            let totalNoise = 0;
+
+            if (data.layers && data.layers.length > 0) {
+                for (const layer of data.layers) {
+                    let n = noise2D(
+                        (globalX + layer.offsetX) * layer.noiseScale,
+                        (globalY + layer.offsetZ) * layer.noiseScale
+                    );
+
+                    if (layer.roughness > 0) {
+                        n += 0.5 * layer.roughness * noise2D(
+                            (globalX + layer.offsetX) * layer.noiseScale * 2,
+                            (globalY + layer.offsetZ) * layer.noiseScale * 2
+                        );
+                    }
+
+                    totalNoise += n * layer.heightScale;
+                }
+            } else {
+                totalNoise = noise2D(globalX * 0.02, globalY * 0.02) * 5;
+            }
 
             // Apply Height
-            // Normalize slightly to prevent extreme spikes if many layers add up?
-            // For now, trust the AI settings.
-            const z = totalNoise;
-            posAttribute.setZ(i, z);
+            posAttribute.setZ(i, totalNoise);
 
             // Color
-            // Determine alpha based on relative height. 
-            // We need a heuristic for "Max Height" to normalize color.
-            // Let's assume a standard max height of ~20-30 for coloring.
-            const alpha = (z / 20 + 0.5);
+            const alpha = (totalNoise / 20 + 0.5);
             const clampedAlpha = Math.max(0, Math.min(1, alpha));
 
             const r = THREE.MathUtils.lerp(colorBase.r, colorHigh.r, clampedAlpha);
@@ -73,7 +156,7 @@ export const Terrain = forwardRef<THREE.Mesh, TerrainProps>(({ data, chunkX = 0,
 
     return (
         <mesh ref={ref} geometry={geometry} rotation={[-Math.PI / 2, 0, 0]} receiveShadow castShadow>
-            <meshStandardMaterial vertexColors roughness={0.8} metalness={0.2} side={THREE.DoubleSide} />
+            <MaterialWrapper data={data} />
         </mesh>
     );
 });

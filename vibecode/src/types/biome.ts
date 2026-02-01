@@ -12,6 +12,7 @@ export interface TerrainRules {
   highColor: string;
   layers: TerrainLayer[];
   waterLevel: number;
+  textureUrl?: string;
 }
 
 export interface AtmosphereParams {
@@ -19,6 +20,7 @@ export interface AtmosphereParams {
   fogColor: string;
   fogDensity: number;
   sunIntensity: number;
+  skyboxUrl?: string;
 }
 
 // The "Scientific" parameters that feed the AI
@@ -26,7 +28,16 @@ export interface BiomeParameters {
   temperature: number; // -50 to 100 Celsius
   gravity: number; // 0.1 to 2.0 G relative to Earth
   atmosphereDensity: string; // "Thin", "Standard", "Thick"
-  description: string; // Short generated prompt
+  description: string; // Master narrative
+  groundDescription: string; // Specific for terrain texture
+  skyDescription: string; // Specific for skybox
+}
+
+export interface WeatherParams {
+  type: 'none' | 'rain' | 'snow' | 'sandstorm' | 'spores';
+  intensity: number; // 0 to 1
+  color: string;
+  speed: number;
 }
 
 export interface BiomeData {
@@ -37,4 +48,5 @@ export interface BiomeData {
   terrain: TerrainRules;
   atmosphere: AtmosphereParams;
   musicPrompt?: string; // Prompt for ElevenLabs Music API
+  weather: WeatherParams;
 }

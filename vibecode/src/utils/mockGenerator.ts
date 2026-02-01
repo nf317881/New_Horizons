@@ -8,7 +8,9 @@ export const generateMockBiome = (): BiomeData => {
             temperature: 20,
             gravity: 1,
             atmosphereDensity: "Standard",
-            description: "Mock data"
+            description: "Mock data",
+            groundDescription: "rocky moss",
+            skyDescription: "clear blue sky"
         },
         terrain: {
             baseColor: '#2d4c1e',
@@ -38,6 +40,12 @@ export const generateMockBiome = (): BiomeData => {
             fogColor: '#87CEEB',
             fogDensity: 0.02,
             sunIntensity: 1.0
+        },
+        weather: {
+            type: 'spores',
+            intensity: 1.5,
+            color: '#ffaa44', // Warm orange spores
+            speed: 1.0
         }
     };
 };
