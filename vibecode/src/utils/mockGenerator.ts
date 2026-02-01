@@ -1,7 +1,9 @@
 import type { BiomeData } from '../types/biome';
+import { v4 as uuidv4 } from 'uuid';
 
 export const generateMockBiome = (): BiomeData => {
     return {
+        id: uuidv4(),
         name: "MOSSY ARCHIPELAGO",
         description: "Floating islands covered in alien moss.",
         parameters: {

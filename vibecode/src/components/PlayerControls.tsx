@@ -43,9 +43,18 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ mode, onToggleMo
     const BASE_GRAVITY = 30.0;
     const JUMP_FORCE = 15.0;
 
+    const modeRef = useRef(mode);
+    const onToggleModeRef = useRef(onToggleMode);
+
+    useEffect(() => {
+        modeRef.current = mode;
+        onToggleModeRef.current = onToggleMode;
+    }, [mode, onToggleMode]);
+
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.repeat) return;
+
             switch (event.code) {
                 case 'ArrowUp':
                 case 'KeyW': moveState.current.forward = true; break;
@@ -58,25 +67,45 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ mode, onToggleMo
                 case 'ShiftLeft':
                 case 'ShiftRight': moveState.current.shift = true; break;
                 case 'Space':
-                    if (event.repeat) return;
+                    event.preventDefault();
                     const now = Date.now();
                     const diff = now - lastSpaceTime.current;
-                    lastSpaceTime.current = now;
 
-                    if (diff < 300 && diff > 50) {
-                        onToggleMode();
-                        moveState.current.up = false;
+                    console.log(`[Controls] Space Down - mode: ${modeRef.current}, diff: ${diff}ms`);
+
+                    if (diff < 500 && diff > 15) {
+                        const nextMode = modeRef.current === 'fly' ? 'walk' : 'fly';
+                        console.log(`[Controls] Double-tap! Switching to: ${nextMode}`);
+
+                        onToggleModeRef.current();
                         lastSpaceTime.current = 0;
+
+                        // Reset velocity on mode change
+                        velocity.current.set(0, 0, 0);
+
+                        if (nextMode === 'fly') {
+                            // Give a small vertical boost so the user SEES they are now flying
+                            camera.position.y += 0.2;
+                            velocity.current.y = 10;
+                            moveState.current.up = true;
+                        } else {
+                            moveState.current.up = false;
+                        }
                     } else {
-                        if (mode === 'fly') {
+                        lastSpaceTime.current = now;
+                        if (modeRef.current === 'fly') {
                             moveState.current.up = true;
                         } else if (isGrounded.current) {
+                            console.log('[Controls] Jump!');
                             velocity.current.y = JUMP_FORCE;
                             isGrounded.current = false;
                         }
                     }
                     break;
-                case 'ControlLeft': moveState.current.down = true; break;
+                case 'ControlLeft':
+                    event.preventDefault();
+                    moveState.current.down = true;
+                    break;
             }
         };
 
@@ -104,7 +133,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ mode, onToggleMo
             document.removeEventListener('keydown', handleKeyDown);
             document.removeEventListener('keyup', handleKeyUp);
         };
-    }, [mode, onToggleMode]);
+    }, []);
 
     useFrame((_, delta) => {
         if (!controlsRef.current?.isLocked) return;

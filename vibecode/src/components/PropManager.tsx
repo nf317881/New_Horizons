@@ -28,7 +28,8 @@ export const PropManager: React.FC<PropManagerProps> = ({ biome, noise2D, chunkX
         const startZ = chunkZ * chunkSize;
 
         biome.props.forEach((prop, propIndex) => {
-            let seedValue = hashString(biome.name) + propIndex + chunkX * 31 + chunkZ * 17;
+            // Multiply propIndex by a large number to prevent overlap in seed sequences between different prop types
+            let seedValue = hashString(biome.name) + (propIndex * 1000) + chunkX * 31 + chunkZ * 17;
             const count = Math.floor(prop.density * 20);
 
             for (let i = 0; i < count; i++) {
