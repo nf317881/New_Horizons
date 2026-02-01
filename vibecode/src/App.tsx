@@ -281,19 +281,24 @@ function App() {
 
       {/* Loading Overlay */}
       {isGenerating && (
-        <div style={{
-          position: 'absolute',
-          top: 0, left: 0, width: '100%', height: '100%',
-          background: 'rgba(0,0,0,0.8)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 100,
-          color: '#00ffff',
-          fontFamily: "'Courier New', Courier, monospace",
-          pointerEvents: 'auto', // Ensure loading overlay blocks events
-        }}>
+        <div
+          onMouseDown={e => e.stopPropagation()}
+          onPointerDown={e => e.stopPropagation()}
+          onMouseUp={e => e.stopPropagation()}
+          onClick={e => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            top: 0, left: 0, width: '100%', height: '100%',
+            background: 'rgba(0,0,0,0.8)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+            color: '#00ffff',
+            fontFamily: "'Courier New', Courier, monospace",
+            pointerEvents: 'auto',
+          }}>
           <h2 style={{ textTransform: 'uppercase', letterSpacing: '2px' }}>Generating New World</h2>
           <p>{loadingStep}</p>
         </div>
@@ -302,6 +307,9 @@ function App() {
       <div
         onMouseDown={e => e.stopPropagation()}
         onPointerDown={e => e.stopPropagation()}
+        onMouseUp={e => e.stopPropagation()}
+        onPointerUp={e => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
         style={{
           position: 'fixed',
           top: 0,
@@ -313,13 +321,7 @@ function App() {
         <Leva theme={{ colors: { highlight1: '#ff00ff', highlight2: '#00ffff' } }} />
       </div>
 
-      <Canvas shadows camera={{ position: [0, 5, 10], fov: 60 }} onPointerDown={(e) => {
-        // Explicitly activate PointerLockControls only when clicking the canvas itself
-        // This prevents Leva or other UI elements from triggering it.
-        if (e.target === e.currentTarget) {
-          (e.target as HTMLCanvasElement).requestPointerLock();
-        }
-      }}>
+      <Canvas shadows camera={{ position: [0, 5, 10], fov: 60 }}>
         <Scene biome={biome} mode={mode} setMode={setMode} weatherActive={weatherActive} />
       </Canvas>
 

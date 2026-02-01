@@ -71,6 +71,7 @@ export const Weather = ({ params, active }: { params: WeatherParams, active: boo
         const colors = new Float32Array(particleCount * 3);
 
         const baseColor = new THREE.Color(params.color);
+        console.log(`Weather System: Running ${params.type} with color ${params.color}`);
 
         for (let i = 0; i < particleCount; i++) {
             positions[i * 3] = (Math.random() - 0.5) * boxSize;
@@ -86,9 +87,20 @@ export const Weather = ({ params, active }: { params: WeatherParams, active: boo
             velocities[i * 3 + 2] = windZ;
             randomOffsets[i] = Math.random() * Math.PI * 2;
 
-            // Color noise: randomly vary lightness/saturation slightly
-            const noise = (Math.random() - 0.5) * 0.2;
-            const c = baseColor.clone().offsetHSL(0, 0, noise);
+            // Better Color noise: vary HSL subtly to avoid clipping to white
+            const hNoise = (Math.random() - 0.5) * 0.05; // 5% hue drift
+            const sNoise = (Math.random() - 0.5) * 0.1;  // 10% saturation drift
+            const lNoise = (Math.random() - 0.5) * 0.1;  // 10% lightness drift
+
+            const c = baseColor.clone();
+            const hsl = { h: 0, s: 0, l: 0 };
+            c.getHSL(hsl);
+            c.setHSL(
+                THREE.MathUtils.euclideanModulo(hsl.h + hNoise, 1),
+                THREE.MathUtils.clamp(hsl.s + sNoise, 0, 1),
+                THREE.MathUtils.clamp(hsl.l + lNoise, 0, 1)
+            );
+
             colors[i * 3] = c.r;
             colors[i * 3 + 1] = c.g;
             colors[i * 3 + 2] = c.b;

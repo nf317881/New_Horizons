@@ -119,7 +119,7 @@ export const generateBiomeData = async (description: string, params: BiomeParame
         "weather": {
             "type": "rain" | "snow" | "sandstorm" | "spores",
             "intensity": number (0 to 3),
-            "color": "hex",
+            "color": "hex, consider using a color that is significantly different from white",
             "speed": number (0.5 to 5.0)
         }
     }
@@ -159,7 +159,12 @@ export const generateBiomeData = async (description: string, params: BiomeParame
         terrain: parsedContext.terrain,
         atmosphere: parsedContext.atmosphere,
         musicPrompt: parsedContext.musicPrompt,
-        weather: (parsedContext.weather as WeatherParams) || { type: 'none', intensity: 0, color: '#ffffff', speed: 1.0 }
+        weather: {
+            type: parsedContext.weather?.type || 'none',
+            intensity: parsedContext.weather?.intensity ?? 0,
+            color: parsedContext.weather?.color || '#ffffff',
+            speed: parsedContext.weather?.speed ?? 1.0
+        } as WeatherParams
     };
 };
 // 4. Generate Texture using "Nano Banana" (Gemini 2.5 Flash Image via OpenRouter)
