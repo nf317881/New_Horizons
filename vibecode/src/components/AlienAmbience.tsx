@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { getAlienAmbienceV9 } from '../services/elevenLabsV9';
+import { getAlienAmbienceV13 } from '../services/elevenLabsV13';
 import type { BiomeData } from '../types/biome';
 
 /**
- * AlienAmbience - Version 6
- * Renamed to force browser to dump stale 'BackgroundMusic' cache.
+ * AlienAmbience - Version 13
+ * Fixes credit consumption with music_length_ms.
  */
 const AlienAmbience: React.FC<{ biome: BiomeData }> = ({ biome }) => {
-    console.log("AlienAmbience(V9): Rendering for", biome?.name);
+    console.log("AlienAmbience(V13): Rendering for", biome?.name);
 
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -20,18 +20,18 @@ const AlienAmbience: React.FC<{ biome: BiomeData }> = ({ biome }) => {
         if (initRef.current) return;
         initRef.current = true;
 
-        console.log("AlienAmbience(V9): Component Mounted");
+        console.log("AlienAmbience(V13): Component Mounted");
 
         const load = async () => {
             try {
                 setIsGenerating(true);
                 const prompt = biome.musicPrompt || "Deep space ambient drone, alien atmosphere, mysterious synthesizers, instrumental";
-                console.log("AlienAmbience(V9): Requesting V9 Ambience...");
-                const url = await getAlienAmbienceV9(prompt);
-                console.log("AlienAmbience(V9): Audio URL ready:", url);
+                console.log("AlienAmbience(V13): Requesting V13 Ambience (30000ms)...");
+                const url = await getAlienAmbienceV13(prompt);
+                console.log("AlienAmbience(V13): Audio URL ready:", url);
                 setAudioUrl(url);
             } catch (err: any) {
-                console.error("AlienAmbience(V9) Failure:", err);
+                console.error("AlienAmbience(V13) Failure:", err);
                 setError(err.message);
             } finally {
                 setIsGenerating(false);
@@ -47,7 +47,7 @@ const AlienAmbience: React.FC<{ biome: BiomeData }> = ({ biome }) => {
             audioRef.current.pause();
         } else {
             audioRef.current.play().catch(e => {
-                console.warn("AlienAmbience(V9): Autoplay blocked:", e);
+                console.warn("AlienAmbience(V13): Autoplay blocked:", e);
                 setError("Interaction Required");
             });
         }
@@ -90,7 +90,7 @@ const AlienAmbience: React.FC<{ biome: BiomeData }> = ({ biome }) => {
                 boxShadow: isPlaying ? '0 0 10px #0ff' : 'none'
             }} />
             <span>
-                {isGenerating ? 'GEN_AUDIO...' : isPlaying ? 'SOUND_ON' : 'SOUND_OFF'}
+                [V13] {isGenerating ? 'GEN_AUDIO...' : isPlaying ? 'SOUND_ON' : 'SOUND_OFF'}
             </span>
             {error && <span style={{ fontSize: 9, color: '#f55' }}>ERR:{error.slice(0, 10)}</span>}
         </div>
