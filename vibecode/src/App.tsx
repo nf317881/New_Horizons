@@ -246,6 +246,7 @@ function App() {
           parameters: { ...prev.parameters, atmosphereDensity: v }
         }));
       }
+    },
     'Weather System': {
       label: 'Auto Weather',
       value: weatherEnabled,

@@ -41,6 +41,7 @@ export const generateMockBiome = (): BiomeData => {
             fogDensity: 0.02,
             sunIntensity: 1.0
         },
+        musicPrompt: "Deep space ambient drone, Mossy alien archipelago, mysterious synthesizers, instrumental",
         weather: {
             type: 'spores',
             intensity: 1.5,
