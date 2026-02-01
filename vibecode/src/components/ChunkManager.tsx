@@ -1,8 +1,7 @@
-import { createNoise2D } from 'simplex-noise';
 import React, { useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Terrain } from './Terrain';
-import { FloraSystem } from './FloraSystem';
+import { PropManager } from './PropManager';
 import type { BiomeData } from '../types/biome';
 import { Mesh } from 'three';
 import * as THREE from 'three';
@@ -10,11 +9,12 @@ import { createRandom } from '../utils/terrainMath';
 
 interface ChunkManagerProps {
     biome: BiomeData;
-    terrainRef?: React.Ref<Mesh>; // Pass this appropriately if needed for raycasting
+    noise2D: any;
+    terrainRef?: React.Ref<Mesh>;
 }
 
 // We'll export a Group Ref that contains all chunks
-export const ChunkManager = React.forwardRef<THREE.Group, ChunkManagerProps>(({ biome }, ref) => {
+export const ChunkManager = React.forwardRef<THREE.Group, ChunkManagerProps>(({ biome, noise2D }, ref) => {
     const { camera } = useThree();
     const [chunks, setChunks] = useState<{ key: string, x: number, z: number }[]>([]);
 
@@ -66,12 +66,12 @@ export const ChunkManager = React.forwardRef<THREE.Group, ChunkManagerProps>(({ 
                         chunkZ={chunk.z}
                         noise2D={noise2D}
                     />
-                    <FloraSystem
-                        terrainData={biome.terrain}
-                        parameters={biome.parameters}
+                    <PropManager
+                        biome={biome}
                         noise2D={noise2D}
                         chunkX={chunk.x}
                         chunkZ={chunk.z}
+                        chunkSize={CHUNK_SIZE}
                     />
                 </group>
             ))}

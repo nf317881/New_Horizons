@@ -1,4 +1,4 @@
-# Vibecode
+# New Horizons
 
 A proceeding generation infinite landscape explorer built with React, Three.js, and React Three Fiber.
 

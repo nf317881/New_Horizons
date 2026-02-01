@@ -1,7 +1,9 @@
 import type { BiomeData } from '../types/biome';
+import { v4 as uuidv4 } from 'uuid';
 
 export const generateMockBiome = (): BiomeData => {
     return {
+        id: uuidv4(),
         name: "MOSSY ARCHIPELAGO",
         description: "Floating islands covered in alien moss.",
         parameters: {
@@ -43,6 +45,10 @@ export const generateMockBiome = (): BiomeData => {
             sunIntensity: 1.0
         },
         musicPrompt: "Deep space ambient drone, Mossy alien archipelago, mysterious synthesizers, instrumental",
+        props: [
+            { id: 'p1', name: 'Alien Pitcher Plant', prompt: 'A large alien pitcher plant with bio-luminescent veins and mossy texture', density: 0.1, baseScale: 5 },
+            { id: 'p2', name: 'Glow Cactus', prompt: 'A neon purple alien cactus with glowing spines', density: 0.05, baseScale: 3 }
+        ],
         weather: {
             type: 'spores',
             intensity: 1.5,

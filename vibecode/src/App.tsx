@@ -1,7 +1,7 @@
-import React, { useRef, useState, useEffect } from 'react'
+import React, { useRef, useState, useEffect, useMemo } from 'react'
 import { Canvas, useThree, useFrame } from '@react-three/fiber'
 import { Stars, useTexture } from '@react-three/drei'
-import { Leva, useControls, button } from 'leva'
+import { Leva, useControls, button, folder } from 'leva'
 import { ChunkManager } from './components/ChunkManager'
 import AlienAmbience from './components/AlienAmbience'
 import { generateMockBiome } from './utils/mockGenerator'
@@ -15,6 +15,8 @@ import { GalaxyGallery } from './components/GalaxyGallery'
 import { saveBiomeToGallery, type SavedBiome } from './services/gallery'
 import { uploadTextureFromUrl, uploadAudio } from './services/ThreeDStorage'
 import { getStoredV13Audio } from './services/elevenLabsV13'
+import { createNoise2D } from 'simplex-noise'
+
 
 function Skybox({ url }: { url: string }) {
   const { scene } = useThree();
@@ -43,7 +45,7 @@ function DynamicFog({ biome, weatherActive }: { biome: BiomeData, weatherActive:
       // Base fog is reduced if we have a skybox to see the sky better
       const baseMult = biome.atmosphere.skyboxUrl ? 0.3 : 0.8;
       // Weather significantly increases fog density
-      const weatherMult = weatherActive ? (1.2 + biome.weather.intensity) : 1.0;
+      const weatherMult = weatherActive ? (1.0 + biome.weather.intensity) : 1.0;
 
       const targetDensity = biome.atmosphere.fogDensity * baseMult * weatherMult;
 
@@ -56,13 +58,30 @@ function DynamicFog({ biome, weatherActive }: { biome: BiomeData, weatherActive:
   return null;
 }
 
-function Scene({ biome, mode, setMode, weatherActive }: {
+function Scene({ biome, mode, onToggleMode, weatherActive, noise2D }: {
   biome: BiomeData,
   mode: 'fly' | 'walk',
-  setMode: React.Dispatch<React.SetStateAction<'fly' | 'walk'>>,
-  weatherActive: boolean
+  onToggleMode: () => void,
+  weatherActive: boolean,
+  noise2D: any
 }) {
   const terrainRef = useRef<Group>(null);
+  const lightRef = useRef<THREE.DirectionalLight>(null);
+  const { camera } = useThree();
+
+  useFrame(() => {
+    if (lightRef.current) {
+      // Keep light offset from camera
+      lightRef.current.position.set(
+        camera.position.x + 40,
+        camera.position.y + 60,
+        camera.position.z + 20
+      );
+      // Target the area in front of the camera
+      lightRef.current.target.position.set(camera.position.x, 0, camera.position.z);
+      lightRef.current.target.updateMatrixWorld();
+    }
+  });
 
   return (
     <>
@@ -88,27 +107,24 @@ function Scene({ biome, mode, setMode, weatherActive }: {
       <fogExp2 attach="fog" args={[biome.atmosphere.fogColor, biome.atmosphere.fogDensity]} />
       <DynamicFog biome={biome} weatherActive={weatherActive} />
 
-      <ambientLight intensity={0.2} />
+      <ambientLight intensity={0.5} />
       <directionalLight
-        position={[50, 50, 25]}
+        ref={lightRef}
         intensity={biome.atmosphere.sunIntensity}
         castShadow
+        shadow-bias={-0.0005}
         shadow-mapSize={[2048, 2048]}
-      />
+      >
+        <orthographicCamera attach="shadow-camera" args={[-100, 100, 100, -100, 0.5, 500]} />
+      </directionalLight>
 
       {/* Dynamic Chunks */}
-      <ChunkManager ref={terrainRef} biome={biome} />
-
-      {/* Debug Box to confirm scene renders */}
-      <mesh position={[0, 10, 0]}>
-        <boxGeometry args={[5, 5, 5]} />
-        <meshBasicMaterial color="red" wireframe />
-      </mesh>
+      <ChunkManager ref={terrainRef} biome={biome} noise2D={noise2D} />
 
       {/* Unified Controls for both modes */}
       <PlayerControls
         mode={mode}
-        onToggleMode={() => setMode(prev => prev === 'fly' ? 'walk' : 'fly')}
+        onToggleMode={onToggleMode}
         gravityMult={biome.parameters.gravity}
         terrainMesh={terrainRef}
       />
@@ -120,7 +136,7 @@ function App() {
   console.log("App Rendering...");
   // Initial biome
   const [biome, setBiome] = useState<BiomeData>(() => generateMockBiome())
-  const [mode, setMode] = useState<'fly' | 'walk'>('fly')
+  const noise2D = useMemo(() => createNoise2D(), [biome.id]);
   const [isGenerating, setIsGenerating] = useState(false);
   const isGeneratingRef = useRef(false);
   const [loadingStep, setLoadingStep] = useState("");
@@ -171,7 +187,7 @@ function App() {
 
       // 3. Data (Gemini Flash)
       setLoadingStep("Simulating Terrain Physics (Gemini 3 Flash)...");
-      const newBiomeData = await generateBiomeData(detailedDesc.summary, params);
+      const newBiomeData = await generateBiomeData(detailedDesc, params);
 
       // 4. Texture (Flux)
       setLoadingStep("Synthesizing Nano-Textures...");
@@ -271,17 +287,13 @@ function App() {
   };
 
   // Leva controls for quick regeneration
-  const [, setLeva] = useControls(() => ({
+  const [{ mode }, set] = useControls(() => ({
     'Regenerate World': button(() => {
       handleRegenerate();
     }),
-    'Mode': {
+    'mode': {
       options: { 'Fly Mode': 'fly', 'Walk Mode': 'walk' },
-      value: mode,
-      onChange: (v: string) => setMode(v as 'fly' | 'walk')
-    },
-    'Flora Parameters': {
-      value: false, // folder or boolean? Leva doesn't do folders easily in useControls object style without grouping
+      value: 'fly',
     },
     'Gravity': {
       value: biome.parameters.gravity,
@@ -294,38 +306,142 @@ function App() {
         }));
       }
     },
-    'Temperature': {
-      value: biome.parameters.temperature,
-      min: -50,
-      max: 100,
-      onChange: (v: number) => {
-        setBiome(prev => ({
-          ...prev,
-          parameters: { ...prev.parameters, temperature: v }
-        }));
-      }
-    },
-    'Atmosphere': {
-      options: { 'Thin': 'Thin', 'Standard': 'Standard', 'Thick': 'Thick' },
-      value: biome.parameters.atmosphereDensity,
-      onChange: (v: string) => {
-        setBiome(prev => ({
-          ...prev,
-          parameters: { ...prev.parameters, atmosphereDensity: v }
-        }));
-      }
-    },
     'Weather System': {
       label: 'Auto Weather',
       value: weatherEnabled,
       onChange: (v: boolean) => setWeatherEnabled(v)
-    }
-  }));
+    },
+    'Terrain Controls': folder({
+      'Base Color': {
+        value: biome.terrain.baseColor,
+        onChange: (v: string) => {
+          setBiome(prev => ({
+            ...prev,
+            terrain: { ...prev.terrain, baseColor: v }
+          }));
+        }
+      },
+      'High Color': {
+        value: biome.terrain.highColor,
+        onChange: (v: string) => {
+          setBiome(prev => ({
+            ...prev,
+            terrain: { ...prev.terrain, highColor: v }
+          }));
+        }
+      },
+      'Layers': folder(
+        biome.terrain.layers.reduce((acc, layer, index) => {
+          const noiseScaleKey = `layer_${index}_noiseScale`;
+          const heightScaleKey = `layer_${index}_heightScale`;
+          const roughnessKey = `layer_${index}_roughness`;
 
-  // Sync state -> Leva UI
-  useEffect(() => {
-    setLeva({ 'Mode': mode, 'Weather System': weatherEnabled });
-  }, [mode, weatherEnabled, setLeva]);
+          acc[layer.name || `Layer ${index + 1}`] = folder({
+            [noiseScaleKey]: {
+              label: 'Noise Scale',
+              value: layer.noiseScale,
+              min: 0.001,
+              max: 0.2,
+              step: 0.001,
+              onChange: (v: number) => {
+                setBiome(prev => {
+                  const nextLayers = [...prev.terrain.layers];
+                  if (nextLayers[index]) {
+                    nextLayers[index] = { ...nextLayers[index], noiseScale: v };
+                  }
+                  return { ...prev, terrain: { ...prev.terrain, layers: nextLayers } };
+                });
+              }
+            },
+            [heightScaleKey]: {
+              label: 'Height Scale',
+              value: layer.heightScale,
+              min: 0,
+              max: 100,
+              step: 0.5,
+              onChange: (v: number) => {
+                setBiome(prev => {
+                  const nextLayers = [...prev.terrain.layers];
+                  if (nextLayers[index]) {
+                    nextLayers[index] = { ...nextLayers[index], heightScale: v };
+                  }
+                  return { ...prev, terrain: { ...prev.terrain, layers: nextLayers } };
+                });
+              }
+            },
+            [roughnessKey]: {
+              label: 'Roughness',
+              value: layer.roughness,
+              min: 0,
+              max: 5,
+              step: 0.1,
+              onChange: (v: number) => {
+                setBiome(prev => {
+                  const nextLayers = [...prev.terrain.layers];
+                  if (nextLayers[index]) {
+                    nextLayers[index] = { ...nextLayers[index], roughness: v };
+                  }
+                  return { ...prev, terrain: { ...prev.terrain, layers: nextLayers } };
+                });
+              }
+            }
+          }, { collapsed: true });
+          return acc;
+        }, {} as any),
+        { collapsed: true }
+      )
+    }, { collapsed: true }),
+    'Prop Controls': folder(
+      biome.props.reduce((acc, prop, index) => {
+        // Use a unique key for each input but keep the visible label simple
+        const densityKey = `prop_${index}_density`;
+        const scaleKey = `prop_${index}_scale`;
+
+        acc[prop.name] = folder({
+          [densityKey]: {
+            label: 'Density',
+            value: prop.density,
+            min: 0,
+            max: 0.5,
+            step: 0.01,
+            onChange: (v: number) => {
+              setBiome(prev => {
+                const nextProps = [...prev.props];
+                if (nextProps[index]) {
+                  nextProps[index] = { ...nextProps[index], density: v };
+                }
+                return { ...prev, props: nextProps };
+              });
+            }
+          },
+          [scaleKey]: {
+            label: 'Scale',
+            value: prop.baseScale,
+            min: 0.5,
+            max: 15,
+            step: 0.1,
+            onChange: (v: number) => {
+              setBiome(prev => {
+                const nextProps = [...prev.props];
+                if (nextProps[index]) {
+                  nextProps[index] = { ...nextProps[index], baseScale: v };
+                }
+                return { ...prev, props: nextProps };
+              });
+            }
+          }
+        }, { collapsed: true });
+        return acc;
+      }, {} as any),
+      { collapsed: true }
+    )
+  }), [biome.id, weatherEnabled]) as any;
+
+  const toggleMode = React.useCallback(() => {
+    set({ mode: mode === 'fly' ? 'walk' : 'fly' });
+  }, [mode, set]);
+
+
 
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#000' }}>
@@ -389,8 +505,18 @@ function App() {
         <Leva theme={{ colors: { highlight1: '#ff00ff', highlight2: '#00ffff' } }} />
       </div>
 
-      <Canvas shadows camera={{ position: [0, 5, 10], fov: 60 }}>
-        <Scene biome={biome} mode={mode} setMode={setMode} weatherActive={weatherActive} />
+      <Canvas shadows camera={{ position: [0, 5, 10], fov: 60 }} onPointerDown={(e) => {
+        if (e.target === e.currentTarget) {
+          (e.target as HTMLCanvasElement).requestPointerLock();
+        }
+      }}>
+        <Scene
+          biome={biome}
+          mode={mode}
+          onToggleMode={toggleMode}
+          weatherActive={weatherActive}
+          noise2D={noise2D}
+        />
       </Canvas>
 
       <AlienAmbience biome={biome} audioOverrideUrl={(biome as any).audioOverrideUrl} />
