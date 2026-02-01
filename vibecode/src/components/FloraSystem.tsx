@@ -212,11 +212,6 @@ export const FloraSystem: React.FC<FloraSystemProps> = ({ terrainData, parameter
                 <meshStandardMaterial vertexColors roughness={0.9} />
             </instancedMesh>
 
-            {/* Debug Cube retained but smaller */}
-            <mesh position={[0, 0, 50]}>
-                <boxGeometry args={[1, 1, 1]} />
-                <meshBasicMaterial color="magenta" wireframe />
-            </mesh>
         </group>
     );
 };

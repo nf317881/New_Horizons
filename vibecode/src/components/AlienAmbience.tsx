@@ -90,7 +90,7 @@ const AlienAmbience: React.FC<{ biome: BiomeData }> = ({ biome }) => {
                 boxShadow: isPlaying ? '0 0 10px #0ff' : 'none'
             }} />
             <span>
-                [V13] {isGenerating ? 'GEN_AUDIO...' : isPlaying ? 'SOUND_ON' : 'SOUND_OFF'}
+                {isGenerating ? 'GEN_AUDIO...' : isPlaying ? 'SOUND_ON' : 'SOUND_OFF'}
             </span>
             {error && <span style={{ fontSize: 9, color: '#f55' }}>ERR:{error.slice(0, 10)}</span>}
         </div>
