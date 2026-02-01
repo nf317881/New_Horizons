@@ -63,8 +63,7 @@ export const generateBiomeDescription = async (params: BiomeParameters): Promise
         },
         body: JSON.stringify({
             model: "google/gemini-3-flash-preview",
-            messages: [{ role: "user", content: prompt }],
-            temperature: 1.2
+            messages: [{ role: "user", content: prompt }]
         })
     });
 
@@ -168,7 +167,10 @@ export const generateBiomeData = async (desc: DetailedDescription, params: Biome
         name: parsedContext.name,
         description: desc.summary,
         parameters: params,
-        terrain: parsedContext.terrain,
+        terrain: {
+            ...parsedContext.terrain,
+            seed: Math.floor(Math.random() * 100000)
+        },
         atmosphere: parsedContext.atmosphere,
         musicPrompt: parsedContext.musicPrompt,
         props: (parsedContext.props || []).map((p: any) => ({
@@ -189,7 +191,7 @@ export const generateBiomeData = async (desc: DetailedDescription, params: Biome
 // 4. Generate Texture using "Nano Banana" (Gemini 2.5 Flash Image via OpenRouter)
 export const generateBiomeTexture = async (description: string): Promise<string> => {
     const apiKey = getApiKey();
-    const model = "black-forest-labs/flux.2-klein-4b";
+    const model = "google/gemini-2.5-flash-image";
     const isGemini = model.includes("gemini");
     const prompt = `Seamless repeatable top-down texture of ${description}. NO PLANTS, NO TREES, NO GRASS. Only raw ground material (e.g. ${description}). High resolution, detailed, photorealistic, PBR style.`;
 
@@ -257,7 +259,7 @@ export const generateBiomeTexture = async (description: string): Promise<string>
 // 5. Generate Skybox using Flux
 export const generateSkyboxTexture = async (description: string): Promise<string> => {
     const apiKey = getApiKey();
-    const model = "black-forest-labs/flux.2-klein-4b";
+    const model = "google/gemini-2.5-flash-image";
     const isGemini = model.includes("gemini");
     // To minimize seams, we explicitly ask for equirectangular 360 panorama and mention no foreground objects.
     const prompt = `Seamless 360-degree equirectangular panoramic skybox of ${description}. SKY ONLY. Panoramic view, no ground, no plants, no foreground objects. Perfect horizontal tiling. High resolution, cosmic, realistic.`;

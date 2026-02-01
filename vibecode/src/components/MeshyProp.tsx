@@ -12,35 +12,46 @@ interface MeshyPropProps {
 }
 
 // Global cache to avoid re-generating the same prompt in the same session
-const modelCache: Record<string, string> = {};
+export const modelCache: Record<string, string> = {};
 
 export const MeshyProp: React.FC<MeshyPropProps> = ({ prop, position, normal, seed }) => {
-    const [glbUrl, setGlbUrl] = useState<string | null>(modelCache[prop.prompt] || null);
+    // Priority: 1. prop.url (loaded from database), 2. modelCache (cached in session)
+    const [glbUrl, setGlbUrl] = useState<string | null>(prop.url || modelCache[prop.prompt] || null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const generationStarted = useRef(false);
 
     useEffect(() => {
+        // 1. Immediate guards
         if (glbUrl || isGenerating || generationStarted.current) return;
 
-        console.log(`MeshyProp: Starting generation for [${prop.name}]`);
+        // 2. Check cache one last time before starting
+        if (modelCache[prop.prompt]) {
+            setGlbUrl(modelCache[prop.prompt]);
+            return;
+        }
+
+        console.log(`[MeshyProp] Requesting: ${prop.name}`);
         generationStarted.current = true;
         setIsGenerating(true);
 
         generate3DModel(prop.prompt)
             .then(url => {
-                // Apply Vite CORS proxy
-                const proxiedUrl = url.replace('https://assets.meshy.ai', '/meshy-assets');
+                // Apply Vite CORS proxy if needed
+                const proxiedUrl = url.includes('assets.meshy.ai')
+                    ? url.replace('https://assets.meshy.ai', '/meshy-assets')
+                    : url;
+
                 modelCache[prop.prompt] = proxiedUrl;
                 setGlbUrl(proxiedUrl);
                 setIsGenerating(false);
             })
             .catch(err => {
-                console.error(`MeshyProp [${prop.name}] Error:`, err);
+                console.error(`[MeshyProp] ${prop.name} failed:`, err);
                 setError(err.message);
                 setIsGenerating(false);
             });
-    }, [prop.prompt, glbUrl, isGenerating]);
+    }, [prop.prompt, glbUrl]);
 
     return (
         <group position={position}>

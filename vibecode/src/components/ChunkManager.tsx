@@ -12,7 +12,6 @@ interface ChunkManagerProps {
     terrainRef?: React.Ref<Mesh>;
 }
 
-// We'll export a Group Ref that contains all chunks
 export const ChunkManager = React.forwardRef<THREE.Group, ChunkManagerProps>(({ biome, noise2D }, ref) => {
     const { camera } = useThree();
     const [chunks, setChunks] = useState<{ key: string, x: number, z: number }[]>([]);
@@ -22,12 +21,8 @@ export const ChunkManager = React.forwardRef<THREE.Group, ChunkManagerProps>(({ 
     const RENDER_DISTANCE = 2; // Radius in chunks (2 = 5x5 grid)
 
     useFrame(() => {
-        // Simple grid logic
         const currentChunkX = Math.round(camera.position.x / CHUNK_SIZE);
-        const currentChunkZ = Math.round(camera.position.z / CHUNK_SIZE); // Using Z as world Z
-
-        // Check if we need to update
-        // optimization: store last position?
+        const currentChunkZ = Math.round(camera.position.z / CHUNK_SIZE);
 
         const newChunks: { key: string, x: number, z: number }[] = [];
         for (let x = -RENDER_DISTANCE; x <= RENDER_DISTANCE; x++) {

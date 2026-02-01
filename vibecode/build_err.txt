@@ -1,0 +1,4 @@
+﻿src/components/ChunkManager.tsx(7,16): error TS6133: 'Group' is declared but its value is never read.
+src/components/GalaxyGallery.tsx(3,30): error TS1484: 'SavedBiome' is a type and must be imported using a type-only import when 'verbatimModuleSyntax' is enabled.
+src/components/GalaxyGallery.tsx(11,29): error TS6133: 'logout' is declared but its value is never read.
+src/components/Terrain.tsx(6,1): error TS6133: 'getTerrainHeight' is declared but its value is never read.
