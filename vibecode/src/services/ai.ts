@@ -89,6 +89,10 @@ export const generateBiomeData = async (desc: DetailedDescription, params: Biome
     Output MUST be valid JSON matching this schema:
     {
         "name": "Short Cool Name",
+        "parameters": {
+            "gravity": number (0.1 to 2.5),
+            "temperature": number (-100 to 150)
+        },
         "terrain": {
             "baseColor": "hex",
             "highColor": "hex",
@@ -166,7 +170,11 @@ export const generateBiomeData = async (desc: DetailedDescription, params: Biome
         id: uuidv4(),
         name: parsedContext.name,
         description: desc.summary,
-        parameters: params,
+        parameters: {
+            ...params,
+            gravity: Number(parsedContext.parameters?.gravity) || params.gravity,
+            temperature: Number(parsedContext.parameters?.temperature) || params.temperature
+        },
         terrain: {
             ...parsedContext.terrain,
             seed: Math.floor(Math.random() * 100000)

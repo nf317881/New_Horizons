@@ -11,12 +11,20 @@ interface MeshyPropProps {
     seed: number;
 }
 
-// Global cache to avoid re-generating the same prompt in the same session
+// Global cache of original CDN URLs
 export const modelCache: Record<string, string> = {};
+
+const getDisplayUrl = (url: string | null) => {
+    if (!url) return null;
+    if (url.includes('assets.meshy.ai') && import.meta.env.DEV) {
+        return url.replace('https://assets.meshy.ai', '/meshy-assets');
+    }
+    return url;
+};
 
 export const MeshyProp: React.FC<MeshyPropProps> = ({ prop, position, normal, seed }) => {
     // Priority: 1. prop.url (loaded from database), 2. modelCache (cached in session)
-    const [glbUrl, setGlbUrl] = useState<string | null>(prop.url || modelCache[prop.prompt] || null);
+    const [glbUrl, setGlbUrl] = useState<string | null>(getDisplayUrl(prop.url || modelCache[prop.prompt] || null));
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const generationStarted = useRef(false);
@@ -25,25 +33,10 @@ export const MeshyProp: React.FC<MeshyPropProps> = ({ prop, position, normal, se
         // 1. Immediate guards
         if (glbUrl || isGenerating || generationStarted.current) return;
 
-        // 2. Check cache one last time before starting
-        if (modelCache[prop.prompt]) {
-            setGlbUrl(modelCache[prop.prompt]);
-            return;
-        }
-
-        console.log(`[MeshyProp] Requesting: ${prop.name}`);
-        generationStarted.current = true;
-        setIsGenerating(true);
-
         generate3DModel(prop.prompt)
             .then(url => {
-                // Apply Vite CORS proxy if needed
-                const proxiedUrl = url.includes('assets.meshy.ai')
-                    ? url.replace('https://assets.meshy.ai', '/meshy-assets')
-                    : url;
-
-                modelCache[prop.prompt] = proxiedUrl;
-                setGlbUrl(proxiedUrl);
+                modelCache[prop.prompt] = url;
+                setGlbUrl(getDisplayUrl(url));
                 setIsGenerating(false);
             })
             .catch(err => {
@@ -52,6 +45,17 @@ export const MeshyProp: React.FC<MeshyPropProps> = ({ prop, position, normal, se
                 setIsGenerating(false);
             });
     }, [prop.prompt, glbUrl]);
+
+    // Update glbUrl if the prop or cache changes externally (e.g. after a save)
+    useEffect(() => {
+        const url = prop.url || modelCache[prop.prompt];
+        if (url) {
+            const display = getDisplayUrl(url);
+            if (display !== glbUrl) {
+                setGlbUrl(display);
+            }
+        }
+    }, [prop.url, prop.prompt]);
 
     return (
         <group position={position}>
