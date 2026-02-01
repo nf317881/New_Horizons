@@ -33,7 +33,8 @@ export const generateMockBiome = (): BiomeData => {
                     offsetX: 1000,
                     offsetZ: 1000
                 }
-            ]
+            ],
+            seed: 12345
         },
         atmosphere: {
             skyColor: '#87CEEB',

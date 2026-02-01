@@ -182,3 +182,11 @@ export const getAlienAmbienceV13 = async (prompt: string): Promise<string> => {
         throw err;
     }
 };
+
+export const getStoredV13Audio = async (_prompt: string): Promise<string | null> => {
+    try {
+        return await getFromDB("v13_planetary_audio");
+    } catch (e) {
+        return null;
+    }
+};

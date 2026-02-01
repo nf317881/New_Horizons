@@ -2,11 +2,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import { getAlienAmbienceV13 } from '../services/elevenLabsV13';
 import type { BiomeData } from '../types/biome';
 
+interface AlienAmbienceProps {
+    biome: BiomeData;
+    audioOverrideUrl?: string;
+}
+
 /**
  * AlienAmbience - Version 13
  * Fixes credit consumption with music_length_ms.
  */
-const AlienAmbience: React.FC<{ biome: BiomeData }> = ({ biome }) => {
+const AlienAmbience: React.FC<AlienAmbienceProps> = ({ biome, audioOverrideUrl }) => {
     console.log("AlienAmbience(V13): Rendering for", biome?.name);
 
     const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -17,8 +22,22 @@ const AlienAmbience: React.FC<{ biome: BiomeData }> = ({ biome }) => {
     const initRef = useRef(false);
 
     useEffect(() => {
+        if (!biome?.musicPrompt && !audioOverrideUrl) return; // Ensure there's a prompt or override URL
+
+        // If a direct URL is provided (from Gallery), use it directly
+        if (audioOverrideUrl) {
+            console.log("AlienAmbience: Using Override URL", audioOverrideUrl);
+            setAudioUrl(audioOverrideUrl); // Set the audio URL directly
+            setIsGenerating(false);
+            // The play logic will be handled by the audioUrl useEffect
+            return;
+        }
+
         if (initRef.current) return;
         initRef.current = true;
+
+        // Otherwise generate/load from cache
+
 
         console.log("AlienAmbience(V13): Component Mounted");
 

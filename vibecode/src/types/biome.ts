@@ -13,6 +13,7 @@ export interface TerrainRules {
   layers: TerrainLayer[];
   waterLevel: number;
   textureUrl?: string;
+  seed: number;
 }
 
 export interface AtmosphereParams {

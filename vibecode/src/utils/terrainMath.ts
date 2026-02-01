@@ -2,7 +2,7 @@ import { createNoise2D } from 'simplex-noise';
 import type { TerrainRules } from '../types/biome';
 
 // Simple Linear Congruential Generator for seeding
-const createRandom = (seed: number) => {
+export const createRandom = (seed: number) => {
     let s = seed;
     return () => {
         s = (s * 1664525 + 1013904223) % 4294967296;
@@ -22,15 +22,23 @@ export class TerrainMath {
 
     // Calculate height at specific X, Y coordinate
     getHeight(x: number, y: number): number {
-        const { noiseScale, roughness, heightScale } = this.rules;
+        let totalHeight = 0;
 
-        // Base Noise
-        let noise = this.noise2D(x * noiseScale, y * noiseScale);
+        for (const layer of this.rules.layers) {
+            const { noiseScale, roughness, heightScale, offsetX, offsetZ } = layer;
+            const lx = x + offsetX;
+            const ly = y + offsetZ;
 
-        // Detailed Noise (Roughness) - Matching the Terrain.tsx logic
-        noise += 0.5 * roughness * this.noise2D(x * noiseScale * 4, y * noiseScale * 4);
-        noise += 0.25 * roughness * this.noise2D(x * noiseScale * 8, y * noiseScale * 8);
+            // Base Noise
+            let noise = this.noise2D(lx * noiseScale, ly * noiseScale);
 
-        return noise * heightScale;
+            // Detailed Noise (Roughness)
+            noise += 0.5 * roughness * this.noise2D(lx * noiseScale * 4, ly * noiseScale * 4);
+            noise += 0.25 * roughness * this.noise2D(lx * noiseScale * 8, ly * noiseScale * 8);
+
+            totalHeight += noise * heightScale;
+        }
+
+        return totalHeight;
     }
 }

@@ -11,6 +11,10 @@ import { Group } from 'three'
 import * as THREE from 'three'
 import { generateRandomParameters, generateBiomeDescription, generateBiomeData, generateBiomeTexture, generateSkyboxTexture } from './services/ai'
 import { Weather } from './components/Weather'
+import { GalaxyGallery } from './components/GalaxyGallery'
+import { saveBiomeToGallery, type SavedBiome } from './services/gallery'
+import { uploadTextureFromUrl, uploadAudio } from './services/ThreeDStorage'
+import { getStoredV13Audio } from './services/elevenLabsV13'
 
 function Skybox({ url }: { url: string }) {
   const { scene } = useThree();
@@ -202,6 +206,70 @@ function App() {
     }
   };
 
+  const handleSaveCurrent = async () => {
+    setIsGenerating(true);
+    setLoadingStep("Archiving Planetary Data...");
+    try {
+      const assets = {
+        skyboxUrl: "",
+        groundTextureUrl: "",
+        audioUrl: "",
+        models: []
+      };
+
+      // 1. Upload Skybox
+      if (biome.atmosphere.skyboxUrl) {
+        setLoadingStep("Uploading Sky Data...");
+        assets.skyboxUrl = await uploadTextureFromUrl(biome.atmosphere.skyboxUrl, biome.id || "unknown_biome", "skybox");
+      }
+
+      // 2. Upload Terrain Texture
+      if (biome.terrain.textureUrl) {
+        setLoadingStep("Uploading Surface Scans...");
+        assets.groundTextureUrl = await uploadTextureFromUrl(biome.terrain.textureUrl, biome.id || "unknown_biome", "ground");
+      }
+
+      // 3. Upload Audio
+      setLoadingStep("Encoding Ambient Frequency...");
+      const audioBase64 = await getStoredV13Audio(biome.musicPrompt || "");
+      if (audioBase64) {
+        assets.audioUrl = await uploadAudio(audioBase64, biome.id || "unknown_biome");
+      }
+
+      // 4. Save Metadata
+      setLoadingStep("Finalizing Database Entry...");
+      await saveBiomeToGallery(biome, assets);
+      alert("System Saved to Interplanetary Database.");
+
+    } catch (e: any) {
+      console.error("Save failed", e);
+      alert("Save Failed: " + (e.message || e));
+    } finally {
+      setIsGenerating(false);
+      setLoadingStep("");
+    }
+  };
+
+  const handleLoadBiome = (b: SavedBiome) => {
+    // Reconstruct the full biome object with asset URLs overriding the ephemeral ones
+    const loadedBiome: BiomeData = {
+      ...b,
+      terrain: {
+        ...b.terrain,
+        textureUrl: b.assets.groundTextureUrl || b.terrain.textureUrl
+      },
+      atmosphere: {
+        ...b.atmosphere,
+        skyboxUrl: b.assets.skyboxUrl || b.atmosphere.skyboxUrl
+      }
+    };
+
+    // Attach the direct audio URL to the biome object (breaking type safety slightly or we update type)
+    (loadedBiome as any).audioOverrideUrl = b.assets.audioUrl;
+
+    setBiome(loadedBiome);
+  };
+
   // Leva controls for quick regeneration
   const [, setLeva] = useControls(() => ({
     'Regenerate World': button(() => {
@@ -325,10 +393,13 @@ function App() {
         <Scene biome={biome} mode={mode} setMode={setMode} weatherActive={weatherActive} />
       </Canvas>
 
-      <AlienAmbience biome={biome} />
+      <AlienAmbience biome={biome} audioOverrideUrl={(biome as any).audioOverrideUrl} />
+
+      <GalaxyGallery onLoadBiome={handleLoadBiome} onSaveCurrent={handleSaveCurrent} />
     </div>
   )
 }
 
-export default App
 
+
+export default App;

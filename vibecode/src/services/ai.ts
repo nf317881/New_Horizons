@@ -156,7 +156,10 @@ export const generateBiomeData = async (description: string, params: BiomeParame
         name: parsedContext.name,
         description: description,
         parameters: params,
-        terrain: parsedContext.terrain,
+        terrain: {
+            ...parsedContext.terrain,
+            seed: Math.floor(Math.random() * 100000)
+        },
         atmosphere: parsedContext.atmosphere,
         musicPrompt: parsedContext.musicPrompt,
         weather: {
