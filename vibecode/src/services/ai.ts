@@ -32,6 +32,7 @@ export interface DetailedDescription {
     summary: string;
     ground: string;
     sky: string;
+    props: string[];
 }
 
 // 2. Call "Gemini Pro" (using OpenRouter ID) for Creative Description
@@ -49,8 +50,9 @@ export const generateBiomeDescription = async (params: BiomeParameters): Promise
     - summary: A creative narrative description (max 50 words).
     - ground: A short prompt for the ground texture. BE SPECIFIC about material (rock, sand, crystal). NO PLANTS.
     - sky: A short prompt for the skybox. Mention colors, moons, or clouds. NO PLANTS.
+    - props: An array of 3-5 short descriptions of alien props (plants, crystals, debris).
 
-    Example: {"summary": "A frozen wasteland...", "ground": "cracked blue ice with silver veins", "sky": "black sky with two green moons"}
+    Example: {"summary": "A frozen wasteland...", "ground": "blue ice", "sky": "black sky", "props": ["a jagged ice crystal", "a frozen blue fern"]}
     `;
 
     const response = await fetch(OPENROUTER_API_URL, {
@@ -73,14 +75,15 @@ export const generateBiomeDescription = async (params: BiomeParameters): Promise
 };
 
 // 3. Call "Gemini Flash" for Structured Data Generation
-export const generateBiomeData = async (description: string, params: BiomeParameters): Promise<BiomeData> => {
+export const generateBiomeData = async (desc: DetailedDescription, params: BiomeParameters): Promise<BiomeData> => {
     const apiKey = getApiKey();
 
     // We want JSON output.
     const prompt = `
     You are a Procedural Generation Engineer. Convert this alien biome description into structured JSON parameters for a terrain engine.
 
-    Description: "${description}"
+    Description: "${desc.summary}"
+    Alien Props to Include: ${JSON.stringify(desc.props)}
     Parameters: Temp ${params.temperature}C, Gravity ${params.gravity}G.
 
     Output MUST be valid JSON matching this schema:
@@ -116,6 +119,14 @@ export const generateBiomeData = async (description: string, params: BiomeParame
             "sunIntensity": number (0.1 to 2.0)
         },
         "musicPrompt": "An ambient space song for the biome; do not include vocals.",
+        "props": [
+            {
+                "name": "Object Name",
+                "prompt": "Detailed 3D generation prompt for Meshy AI",
+                "density": number (0.01 to 0.5),
+                "baseScale": number (1 to 10)
+            }
+        ],
         "weather": {
             "type": "rain" | "snow" | "sandstorm" | "spores",
             "intensity": number (0 to 3),
@@ -154,7 +165,7 @@ export const generateBiomeData = async (description: string, params: BiomeParame
     return {
         id: uuidv4(),
         name: parsedContext.name,
-        description: description,
+        description: desc.summary,
         parameters: params,
         terrain: {
             ...parsedContext.terrain,
@@ -162,6 +173,13 @@ export const generateBiomeData = async (description: string, params: BiomeParame
         },
         atmosphere: parsedContext.atmosphere,
         musicPrompt: parsedContext.musicPrompt,
+        props: (parsedContext.props || []).map((p: any) => ({
+            id: uuidv4(),
+            name: p.name || 'Alien Object',
+            prompt: p.prompt || 'Alien vegetation',
+            density: p.density ?? 0.1,
+            baseScale: p.baseScale ?? 5
+        })),
         weather: {
             type: parsedContext.weather?.type || 'none',
             intensity: parsedContext.weather?.intensity ?? 0,
@@ -173,7 +191,7 @@ export const generateBiomeData = async (description: string, params: BiomeParame
 // 4. Generate Texture using "Nano Banana" (Gemini 2.5 Flash Image via OpenRouter)
 export const generateBiomeTexture = async (description: string): Promise<string> => {
     const apiKey = getApiKey();
-    const model = "black-forest-labs/flux.2-klein-4b";
+    const model = "google/gemini-2.5-flash-image";
     const isGemini = model.includes("gemini");
     const prompt = `Seamless repeatable top-down texture of ${description}. NO PLANTS, NO TREES, NO GRASS. Only raw ground material (e.g. ${description}). High resolution, detailed, photorealistic, PBR style.`;
 
@@ -241,7 +259,7 @@ export const generateBiomeTexture = async (description: string): Promise<string>
 // 5. Generate Skybox using Flux
 export const generateSkyboxTexture = async (description: string): Promise<string> => {
     const apiKey = getApiKey();
-    const model = "black-forest-labs/flux.2-klein-4b";
+    const model = "google/gemini-2.5-flash-image";
     const isGemini = model.includes("gemini");
     // To minimize seams, we explicitly ask for equirectangular 360 panorama and mention no foreground objects.
     const prompt = `Seamless 360-degree equirectangular panoramic skybox of ${description}. SKY ONLY. Panoramic view, no ground, no plants, no foreground objects. Perfect horizontal tiling. High resolution, cosmic, realistic.`;

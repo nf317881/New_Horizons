@@ -18,6 +18,23 @@ export const uploadModel = async (file: Blob | File, biomeId: string, modelType:
 };
 
 /**
+ * Proxies a GLB from an external URL to permanent storage
+ */
+export const uploadModelFromUrl = async (url: string, biomeId: string, modelName: string): Promise<string> => {
+    try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const path = `biomes/${biomeId}/models/${modelName.replace(/\s+/g, '_')}_${Date.now()}.glb`;
+        const storageRef = ref(storage, path);
+        const snapshot = await uploadBytes(storageRef, blob);
+        return await getDownloadURL(snapshot.ref);
+    } catch (e) {
+        console.error("Failed to proxy upload model:", e);
+        return url;
+    }
+}
+
+/**
  * Uploads a texture (PNG/JPG) to Firebase Storage
  * proxying it from a URL if needed (since OpenRouter URLs fade)
  */

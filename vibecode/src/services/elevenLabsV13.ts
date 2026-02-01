@@ -141,14 +141,17 @@ const _internalV13AudioWorker = async (prompt: string, durationInMs: number): Pr
     throw new Error("Timed out waiting for production.");
 };
 
-let activeV13Promise: Promise<string> | null = null;
+// Map to track active generations per biome to prevent redundant calls
+const activeV13Promises: Record<string, Promise<string>> = {};
 
-export const getAlienAmbienceV13 = async (prompt: string): Promise<string> => {
-    // 1. Try to get from IndexedDB (V13 cache key)
+export const getAlienAmbienceV13 = async (biomeId: string, prompt: string): Promise<string> => {
+    const cacheKey = `audio_v13_${biomeId}`;
+
+    // 1. Try to get from IndexedDB (Per-biome cache)
     try {
-        const cached = await getFromDB("v13_planetary_audio");
+        const cached = await getFromDB(cacheKey);
         if (cached) {
-            console.log("elevenLabsV13: Loaded from IndexedDB");
+            console.log(`elevenLabsV13: Loaded audio for ${biomeId} from cache`);
             return base64ToBlobUrl(cached);
         }
     } catch (e) {
@@ -156,36 +159,36 @@ export const getAlienAmbienceV13 = async (prompt: string): Promise<string> => {
     }
 
     // 2. Concurrency Lock
-    if (activeV13Promise) {
-        console.log("elevenLabsV13: Joining existing generation...");
-        const result = await activeV13Promise;
+    if (biomeId in activeV13Promises) {
+        console.log(`elevenLabsV13: Joining existing generation for ${biomeId}...`);
+        const result = await activeV13Promises[biomeId];
         return base64ToBlobUrl(result);
     }
 
     // 3. New Generation
-    console.log("elevenLabsV13: Starting NEW generation (30s)...");
-    activeV13Promise = _internalV13AudioWorker(prompt, 30000); // 30 seconds in MS
+    console.log(`elevenLabsV13: Starting NEW generation for ${biomeId} (30s)...`);
+    const task = _internalV13AudioWorker(prompt, 30000);
+    activeV13Promises[biomeId] = task;
 
     try {
-        const resultBase64 = await activeV13Promise;
+        const resultBase64 = await task;
 
-        // Clean up old IndexedDB V12 to save space
-        const db = await openDB();
-        const transaction = db.transaction(STORE_NAME, "readwrite");
-        transaction.objectStore(STORE_NAME).delete("v12_planetary_audio");
+        await saveToDB(cacheKey, resultBase64);
+        console.log(`elevenLabsV13: Saved audio for ${biomeId} to IndexedDB`);
 
-        await saveToDB("v13_planetary_audio", resultBase64);
-        console.log("elevenLabsV13: Saved to IndexedDB");
+        // Cleanup active promise
+        delete activeV13Promises[biomeId];
+
         return base64ToBlobUrl(resultBase64);
     } catch (err) {
-        activeV13Promise = null;
+        delete activeV13Promises[biomeId];
         throw err;
     }
 };
 
-export const getStoredV13Audio = async (_prompt: string): Promise<string | null> => {
+export const getStoredV13Audio = async (biomeId: string): Promise<string | null> => {
     try {
-        return await getFromDB("v13_planetary_audio");
+        return await getFromDB(`audio_v13_${biomeId}`);
     } catch (e) {
         return null;
     }
