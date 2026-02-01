@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react'
+import React, { useRef, useState, useEffect, useMemo } from 'react'
 import { Canvas, useThree, useFrame } from '@react-three/fiber'
 import { Stars, useTexture } from '@react-three/drei'
 import { Leva, useControls, button } from 'leva'
@@ -11,6 +11,8 @@ import { Group } from 'three'
 import * as THREE from 'three'
 import { generateRandomParameters, generateBiomeDescription, generateBiomeData, generateBiomeTexture, generateSkyboxTexture } from './services/ai'
 import { Weather } from './components/Weather'
+import { createNoise2D } from 'simplex-noise'
+
 
 function Skybox({ url }: { url: string }) {
   const { scene } = useThree();
@@ -52,11 +54,12 @@ function DynamicFog({ biome, weatherActive }: { biome: BiomeData, weatherActive:
   return null;
 }
 
-function Scene({ biome, mode, setMode, weatherActive }: {
+function Scene({ biome, mode, setMode, weatherActive, noise2D }: {
   biome: BiomeData,
   mode: 'fly' | 'walk',
   setMode: React.Dispatch<React.SetStateAction<'fly' | 'walk'>>,
-  weatherActive: boolean
+  weatherActive: boolean,
+  noise2D: any
 }) {
   const terrainRef = useRef<Group>(null);
 
@@ -93,7 +96,9 @@ function Scene({ biome, mode, setMode, weatherActive }: {
       />
 
       {/* Dynamic Chunks */}
-      <ChunkManager ref={terrainRef} biome={biome} />
+      <ChunkManager ref={terrainRef} biome={biome} noise2D={noise2D} />
+
+
 
       {/* Debug Box to confirm scene renders */}
       <mesh position={[0, 10, 0]}>
@@ -116,6 +121,7 @@ function App() {
   console.log("App Rendering...");
   // Initial biome
   const [biome, setBiome] = useState<BiomeData>(() => generateMockBiome())
+  const noise2D = useMemo(() => createNoise2D(), [biome.terrain]);
   const [mode, setMode] = useState<'fly' | 'walk'>('fly')
   const [isGenerating, setIsGenerating] = useState(false);
   const isGeneratingRef = useRef(false);
@@ -167,7 +173,7 @@ function App() {
 
       // 3. Data (Gemini Flash)
       setLoadingStep("Simulating Terrain Physics (Gemini 3 Flash)...");
-      const newBiomeData = await generateBiomeData(detailedDesc.summary, params);
+      const newBiomeData = await generateBiomeData(detailedDesc, params);
 
       // 4. Texture (Flux)
       setLoadingStep("Synthesizing Nano-Textures...");
@@ -321,8 +327,12 @@ function App() {
         <Leva theme={{ colors: { highlight1: '#ff00ff', highlight2: '#00ffff' } }} />
       </div>
 
-      <Canvas shadows camera={{ position: [0, 5, 10], fov: 60 }}>
-        <Scene biome={biome} mode={mode} setMode={setMode} weatherActive={weatherActive} />
+      <Canvas shadows camera={{ position: [0, 5, 10], fov: 60 }} onPointerDown={(e) => {
+        if (e.target === e.currentTarget) {
+          (e.target as HTMLCanvasElement).requestPointerLock();
+        }
+      }}>
+        <Scene biome={biome} mode={mode} setMode={setMode} weatherActive={weatherActive} noise2D={noise2D} />
       </Canvas>
 
       <AlienAmbience biome={biome} />

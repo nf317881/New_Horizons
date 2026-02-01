@@ -33,6 +33,14 @@ export interface BiomeParameters {
   skyDescription: string; // Specific for skybox
 }
 
+export interface PropDefinition {
+  id: string;
+  name: string;
+  prompt: string;
+  density: number; // 0 to 1
+  baseScale: number;
+}
+
 export interface WeatherParams {
   type: 'none' | 'rain' | 'snow' | 'sandstorm' | 'spores';
   intensity: number; // 0 to 1
@@ -41,12 +49,13 @@ export interface WeatherParams {
 }
 
 export interface BiomeData {
-  id?: string; // Optional for now
+  id?: string;
   name: string;
   description: string;
   parameters: BiomeParameters;
   terrain: TerrainRules;
   atmosphere: AtmosphereParams;
-  musicPrompt?: string; // Prompt for ElevenLabs Music API
+  musicPrompt?: string;
+  props: PropDefinition[];
   weather: WeatherParams;
 }
