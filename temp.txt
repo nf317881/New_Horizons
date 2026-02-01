@@ -1,1 +1,2 @@
 "msy_dummy_api_key_for_test_mode_12345678"
+"msy_7FCIF9NotJHeNumeUrg5RB3KGRpYEkyLFZS4"

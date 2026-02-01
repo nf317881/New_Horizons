@@ -40,6 +40,7 @@ export interface PropDefinition {
   prompt: string;
   density: number; // 0 to 1
   baseScale: number;
+  url?: string; // Permanent storage URL
 }
 
 export interface WeatherParams {
@@ -57,6 +58,7 @@ export interface BiomeData {
   terrain: TerrainRules;
   atmosphere: AtmosphereParams;
   musicPrompt?: string;
+  audioOverrideUrl?: string;
   props: PropDefinition[];
   weather: WeatherParams;
 }

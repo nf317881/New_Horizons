@@ -13,9 +13,12 @@ import { generateRandomParameters, generateBiomeDescription, generateBiomeData, 
 import { Weather } from './components/Weather'
 import { GalaxyGallery } from './components/GalaxyGallery'
 import { saveBiomeToGallery, type SavedBiome } from './services/gallery'
-import { uploadTextureFromUrl, uploadAudio } from './services/ThreeDStorage'
+import { uploadTextureFromUrl, uploadAudio, uploadModelFromUrl } from './services/ThreeDStorage'
 import { getStoredV13Audio } from './services/elevenLabsV13'
+import { modelCache } from './components/MeshyProp'
 import { createNoise2D } from 'simplex-noise'
+import { createRandom } from './utils/terrainMath'
+import { useAuth } from './context/AuthContext'
 
 
 function Skybox({ url }: { url: string }) {
@@ -134,9 +137,10 @@ function Scene({ biome, mode, onToggleMode, weatherActive, noise2D }: {
 
 function App() {
   console.log("App Rendering...");
+  const { isOwner } = useAuth();
   // Initial biome
   const [biome, setBiome] = useState<BiomeData>(() => generateMockBiome())
-  const noise2D = useMemo(() => createNoise2D(), [biome.id]);
+  const noise2D = useMemo(() => createNoise2D(createRandom(biome.terrain.seed)), [biome.id, biome.terrain.seed]);
   const [isGenerating, setIsGenerating] = useState(false);
   const isGeneratingRef = useRef(false);
   const [loadingStep, setLoadingStep] = useState("");
@@ -174,8 +178,6 @@ function App() {
       setLoadingStep("Calculating Orbital Parameters...");
       const params = generateRandomParameters();
 
-      // 2. Description (Gemini Pro)
-      setLoadingStep("Consulting Xenobiologist (Gemini 3 Pro)...");
       // 2. Description (Gemini Pro)
       setLoadingStep("Consulting Xenobiologist (Gemini 3 Pro)...");
       const detailedDesc = await generateBiomeDescription(params);
@@ -226,7 +228,7 @@ function App() {
     setIsGenerating(true);
     setLoadingStep("Archiving Planetary Data...");
     try {
-      const assets = {
+      const assets: SavedBiome['assets'] = {
         skyboxUrl: "",
         groundTextureUrl: "",
         audioUrl: "",
@@ -247,12 +249,24 @@ function App() {
 
       // 3. Upload Audio
       setLoadingStep("Encoding Ambient Frequency...");
-      const audioBase64 = await getStoredV13Audio(biome.musicPrompt || "");
+      const audioBase64 = await getStoredV13Audio(biome.id || "unknown_biome");
       if (audioBase64) {
         assets.audioUrl = await uploadAudio(audioBase64, biome.id || "unknown_biome");
       }
 
-      // 4. Save Metadata
+      // 4. Upload 3D Models
+      setLoadingStep("Materializing Artifacts...");
+      for (const prop of biome.props) {
+        const cachedUrl = modelCache[prop.prompt];
+        if (cachedUrl) {
+          console.log(`Uploading model for: ${prop.name}`);
+          const permanentUrl = await uploadModelFromUrl(cachedUrl, biome.id || "unknown_biome", prop.name);
+          prop.url = permanentUrl; // Update in-memory biome object
+          assets.models.push({ type: prop.name, url: permanentUrl });
+        }
+      }
+
+      // 5. Save Metadata
       setLoadingStep("Finalizing Database Entry...");
       await saveBiomeToGallery(biome, assets);
       alert("System Saved to Interplanetary Database.");
@@ -277,111 +291,160 @@ function App() {
       atmosphere: {
         ...b.atmosphere,
         skyboxUrl: b.assets.skyboxUrl || b.atmosphere.skyboxUrl
-      }
+      },
+      audioOverrideUrl: b.assets.audioUrl // RESTORE PERMANENT AUDIO
     };
-
-    // Attach the direct audio URL to the biome object (breaking type safety slightly or we update type)
-    (loadedBiome as any).audioOverrideUrl = b.assets.audioUrl;
 
     setBiome(loadedBiome);
   };
 
   // Leva controls for quick regeneration
-  const [{ mode }, set] = useControls(() => ({
-    'Regenerate World': button(() => {
-      handleRegenerate();
-    }),
-    'mode': {
-      options: { 'Fly Mode': 'fly', 'Walk Mode': 'walk' },
-      value: 'fly',
-    },
-    'Gravity': {
-      value: biome.parameters.gravity,
-      min: 0.1,
-      max: 3.0,
-      onChange: (v: number) => {
-        setBiome(prev => ({
-          ...prev,
-          parameters: { ...prev.parameters, gravity: v }
-        }));
-      }
-    },
-    'Weather System': {
-      label: 'Auto Weather',
-      value: weatherEnabled,
-      onChange: (v: boolean) => setWeatherEnabled(v)
-    },
-    'Terrain Controls': folder({
-      'Base Color': {
-        value: biome.terrain.baseColor,
-        onChange: (v: string) => {
-          setBiome(prev => ({
-            ...prev,
-            terrain: { ...prev.terrain, baseColor: v }
-          }));
-        }
-      },
-      'High Color': {
-        value: biome.terrain.highColor,
-        onChange: (v: string) => {
-          setBiome(prev => ({
-            ...prev,
-            terrain: { ...prev.terrain, highColor: v }
-          }));
-        }
-      },
-      'Layers': folder(
-        biome.terrain.layers.reduce((acc, layer, index) => {
-          const noiseScaleKey = `layer_${index}_noiseScale`;
-          const heightScaleKey = `layer_${index}_heightScale`;
-          const roughnessKey = `layer_${index}_roughness`;
+  const [{ mode }, set] = useControls(() => {
+    const controls: any = {};
 
-          acc[layer.name || `Layer ${index + 1}`] = folder({
-            [noiseScaleKey]: {
-              label: 'Noise Scale',
-              value: layer.noiseScale,
-              min: 0.001,
-              max: 0.2,
-              step: 0.001,
+    if (isOwner) {
+      controls['Regenerate World'] = button(() => {
+        handleRegenerate();
+      });
+    }
+
+    Object.assign(controls, {
+      'mode': {
+        options: { 'Fly Mode': 'fly', 'Walk Mode': 'walk' },
+        value: 'fly',
+      },
+      'Gravity': {
+        value: biome.parameters.gravity,
+        min: 0.1,
+        max: 3.0,
+        onChange: (v: number) => {
+          setBiome(prev => ({
+            ...prev,
+            parameters: { ...prev.parameters, gravity: v }
+          }));
+        }
+      },
+      'Weather System': {
+        label: 'Auto Weather',
+        value: weatherEnabled,
+        onChange: (v: boolean) => setWeatherEnabled(v)
+      },
+      'Terrain Controls': folder({
+        'Base Color': {
+          value: biome.terrain.baseColor,
+          onChange: (v: string) => {
+            setBiome(prev => ({
+              ...prev,
+              terrain: { ...prev.terrain, baseColor: v }
+            }));
+          }
+        },
+        'High Color': {
+          value: biome.terrain.highColor,
+          onChange: (v: string) => {
+            setBiome(prev => ({
+              ...prev,
+              terrain: { ...prev.terrain, highColor: v }
+            }));
+          }
+        },
+        'Layers': folder(
+          (biome.terrain.layers || []).reduce((acc, layer, index) => {
+            const noiseScaleKey = `layer_${index}_noiseScale`;
+            const heightScaleKey = `layer_${index}_heightScale`;
+            const roughnessKey = `layer_${index}_roughness`;
+
+            acc[layer.name || `Layer ${index + 1}`] = folder({
+              [noiseScaleKey]: {
+                label: 'Noise Scale',
+                value: layer.noiseScale,
+                min: 0.001,
+                max: 0.2,
+                step: 0.001,
+                onChange: (v: number) => {
+                  setBiome(prev => {
+                    const nextLayers = [...prev.terrain.layers];
+                    if (nextLayers[index]) {
+                      nextLayers[index] = { ...nextLayers[index], noiseScale: v };
+                    }
+                    return { ...prev, terrain: { ...prev.terrain, layers: nextLayers } };
+                  });
+                }
+              },
+              [heightScaleKey]: {
+                label: 'Height Scale',
+                value: layer.heightScale,
+                min: 0,
+                max: 100,
+                step: 0.5,
+                onChange: (v: number) => {
+                  setBiome(prev => {
+                    const nextLayers = [...prev.terrain.layers];
+                    if (nextLayers[index]) {
+                      nextLayers[index] = { ...nextLayers[index], heightScale: v };
+                    }
+                    return { ...prev, terrain: { ...prev.terrain, layers: nextLayers } };
+                  });
+                }
+              },
+              [roughnessKey]: {
+                label: 'Roughness',
+                value: layer.roughness,
+                min: 0,
+                max: 5,
+                step: 0.1,
+                onChange: (v: number) => {
+                  setBiome(prev => {
+                    const nextLayers = [...prev.terrain.layers];
+                    if (nextLayers[index]) {
+                      nextLayers[index] = { ...nextLayers[index], roughness: v };
+                    }
+                    return { ...prev, terrain: { ...prev.terrain, layers: nextLayers } };
+                  });
+                }
+              }
+            }, { collapsed: true });
+            return acc;
+          }, {} as any),
+          { collapsed: true }
+        )
+      }, { collapsed: true }),
+      'Prop Controls': folder(
+        (biome.props || []).reduce((acc, prop, index) => {
+          // Use a unique key for each input but keep the visible label simple
+          const densityKey = `prop_${index}_density`;
+          const scaleKey = `prop_${index}_scale`;
+
+          acc[prop.name] = folder({
+            [densityKey]: {
+              label: 'Density',
+              value: prop.density,
+              min: 0,
+              max: 0.5,
+              step: 0.01,
               onChange: (v: number) => {
                 setBiome(prev => {
-                  const nextLayers = [...prev.terrain.layers];
-                  if (nextLayers[index]) {
-                    nextLayers[index] = { ...nextLayers[index], noiseScale: v };
+                  const nextProps = [...prev.props];
+                  if (nextProps[index]) {
+                    nextProps[index] = { ...nextProps[index], density: v };
                   }
-                  return { ...prev, terrain: { ...prev.terrain, layers: nextLayers } };
+                  return { ...prev, props: nextProps };
                 });
               }
             },
-            [heightScaleKey]: {
-              label: 'Height Scale',
-              value: layer.heightScale,
-              min: 0,
-              max: 100,
-              step: 0.5,
-              onChange: (v: number) => {
-                setBiome(prev => {
-                  const nextLayers = [...prev.terrain.layers];
-                  if (nextLayers[index]) {
-                    nextLayers[index] = { ...nextLayers[index], heightScale: v };
-                  }
-                  return { ...prev, terrain: { ...prev.terrain, layers: nextLayers } };
-                });
-              }
-            },
-            [roughnessKey]: {
-              label: 'Roughness',
-              value: layer.roughness,
-              min: 0,
-              max: 5,
+            [scaleKey]: {
+              label: 'Scale',
+              value: prop.baseScale,
+              min: 0.5,
+              max: 15,
               step: 0.1,
               onChange: (v: number) => {
                 setBiome(prev => {
-                  const nextLayers = [...prev.terrain.layers];
-                  if (nextLayers[index]) {
-                    nextLayers[index] = { ...nextLayers[index], roughness: v };
+                  const nextProps = [...prev.props];
+                  if (nextProps[index]) {
+                    nextProps[index] = { ...nextProps[index], baseScale: v };
                   }
-                  return { ...prev, terrain: { ...prev.terrain, layers: nextLayers } };
+                  return { ...prev, props: nextProps };
                 });
               }
             }
@@ -390,52 +453,10 @@ function App() {
         }, {} as any),
         { collapsed: true }
       )
-    }, { collapsed: true }),
-    'Prop Controls': folder(
-      biome.props.reduce((acc, prop, index) => {
-        // Use a unique key for each input but keep the visible label simple
-        const densityKey = `prop_${index}_density`;
-        const scaleKey = `prop_${index}_scale`;
+    });
 
-        acc[prop.name] = folder({
-          [densityKey]: {
-            label: 'Density',
-            value: prop.density,
-            min: 0,
-            max: 0.5,
-            step: 0.01,
-            onChange: (v: number) => {
-              setBiome(prev => {
-                const nextProps = [...prev.props];
-                if (nextProps[index]) {
-                  nextProps[index] = { ...nextProps[index], density: v };
-                }
-                return { ...prev, props: nextProps };
-              });
-            }
-          },
-          [scaleKey]: {
-            label: 'Scale',
-            value: prop.baseScale,
-            min: 0.5,
-            max: 15,
-            step: 0.1,
-            onChange: (v: number) => {
-              setBiome(prev => {
-                const nextProps = [...prev.props];
-                if (nextProps[index]) {
-                  nextProps[index] = { ...nextProps[index], baseScale: v };
-                }
-                return { ...prev, props: nextProps };
-              });
-            }
-          }
-        }, { collapsed: true });
-        return acc;
-      }, {} as any),
-      { collapsed: true }
-    )
-  }), [biome.id, weatherEnabled]) as any;
+    return controls;
+  }, [isOwner, biome.id, weatherEnabled]) as any;
 
   const toggleMode = React.useCallback(() => {
     set({ mode: mode === 'fly' ? 'walk' : 'fly' });

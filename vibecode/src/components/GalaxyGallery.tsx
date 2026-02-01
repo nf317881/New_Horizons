@@ -44,17 +44,23 @@ export const GalaxyGallery: React.FC<GalaxyGalleryProps> = ({ onLoadBiome, onSav
     return (
         <>
             {/* Main Control Bar (Bottom Left) */}
-            <div style={{
-                position: 'absolute',
-                bottom: 20,
-                left: 20,
-                zIndex: 200,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'flex-start',
-                gap: '10px',
-                fontFamily: "'Courier New', Courier, monospace"
-            }}>
+            <div
+                onMouseDown={e => e.stopPropagation()}
+                onPointerDown={e => e.stopPropagation()}
+                onMouseUp={e => e.stopPropagation()}
+                onClick={e => e.stopPropagation()}
+                style={{
+                    position: 'absolute',
+                    bottom: 20,
+                    left: 20,
+                    zIndex: 200,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: '10px',
+                    fontFamily: "'Courier New', Courier, monospace",
+                    pointerEvents: 'auto'
+                }}>
                 {/* Admin Button */}
                 {!user && (
                     <button
@@ -180,15 +186,21 @@ export const GalaxyGallery: React.FC<GalaxyGalleryProps> = ({ onLoadBiome, onSav
 
             {/* Auth Modal */}
             {showAuth && (
-                <div style={{
-                    position: 'absolute',
-                    top: 0, left: 0, width: '100%', height: '100%',
-                    background: 'rgba(0,0,0,0.85)',
-                    zIndex: 2500,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                }}>
+                <div
+                    onMouseDown={e => e.stopPropagation()}
+                    onPointerDown={e => e.stopPropagation()}
+                    onMouseUp={e => e.stopPropagation()}
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                        position: 'absolute',
+                        top: 0, left: 0, width: '100%', height: '100%',
+                        background: 'rgba(0,0,0,0.85)',
+                        zIndex: 2500,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        pointerEvents: 'auto'
+                    }}>
                     <form onSubmit={handleLogin} style={{
                         background: '#111',
                         padding: '30px',

@@ -167,6 +167,9 @@ async function pollTask(taskId: string, onProgress?: (progress: number) => void)
     throw new Error("Timed out waiting for Meshy task.");
 }
 
+// Global registry to ensure we don't start the same task multiple times simultaneously.
+const pendingRequests: Record<string, Promise<string>> = {};
+
 /**
  * High-level wrapper that creates a preview, waits, then creates a refine, waits.
  * This ensures high-quality textured models.
@@ -175,11 +178,30 @@ async function pollTask(taskId: string, onProgress?: (progress: number) => void)
  * @returns The final GLB URL of the textured model
  */
 export const generate3DModel = async (prompt: string, onProgress?: (progress: number) => void): Promise<string> => {
-    // 1. Preview Stage (0-50%)
-    const previewTaskId = await createTextTo3DTask(prompt);
-    await pollTask(previewTaskId, (p) => onProgress?.(Math.floor(p * 0.5)));
+    // If a request for this exact prompt is already in progress, return the existing promise
+    if (prompt in pendingRequests) {
+        console.log(`Meshy: Prompt [${prompt.substring(0, 20)}...] already in progress, joining task.`);
+        return pendingRequests[prompt]!;
+    }
 
-    // 2. Refine Stage (50-100%)
-    const refineTaskId = await createTextTo3DRefineTask(previewTaskId);
-    return await pollTask(refineTaskId, (p) => onProgress?.(Math.floor(50 + p * 0.5)));
+    const task = (async () => {
+        try {
+            // 1. Preview Stage (0-50%)
+            const previewTaskId = await createTextTo3DTask(prompt);
+            await pollTask(previewTaskId, (p) => onProgress?.(Math.floor(p * 0.5)));
+
+            // 2. Refine Stage (50-100%)
+            const refineTaskId = await createTextTo3DRefineTask(previewTaskId);
+            const finalUrl = await pollTask(refineTaskId, (p) => onProgress?.(Math.floor(50 + p * 0.5)));
+
+            return finalUrl;
+        } catch (error) {
+            // If it fails, remove from pending so it can be retried later
+            delete pendingRequests[prompt];
+            throw error;
+        }
+    })();
+
+    pendingRequests[prompt] = task;
+    return task;
 };

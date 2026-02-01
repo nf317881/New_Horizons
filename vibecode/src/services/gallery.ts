@@ -72,17 +72,26 @@ export const saveBiomeToGallery = async (biome: BiomeData, assets: SavedBiome['a
         skyDescription: String(biome.parameters.skyDescription || "")
     };
 
+    const safeProps = (biome.props || []).map(p => ({
+        id: String(p.id),
+        name: String(p.name),
+        prompt: String(p.prompt),
+        density: Number(p.density) || 0,
+        baseScale: Number(p.baseScale) || 1,
+        url: p.url ? String(p.url) : null
+    }));
+
     const cleanBiome = {
+        id: biome.id,
         name: String(biome.name || "Unnamed Biome"),
         description: String(biome.description || ""),
         musicPrompt: biome.musicPrompt ? String(biome.musicPrompt) : null,
         parameters: safeParams,
-        // NUCLEAR OPTION: Firestore keeps rejecting 'terrain' as an invalid nested entity.
-        // We are serializing the ENTIRE terrain object to a string.
         terrain: JSON.stringify(safeTerrain),
+        props: JSON.stringify(safeProps),
         atmosphere: safeAtmosphere,
         weather: safeWeather,
-        assets: JSON.parse(JSON.stringify(assets)), // Ensure assets are also plain objects
+        assets: JSON.parse(JSON.stringify(assets)),
         authorId: String(authorId),
         timestamp: Date.now()
     };
@@ -128,9 +137,21 @@ export const fetchGalleryBiomes = async (): Promise<SavedBiome[]> => {
             } catch (e) { }
         }
 
+        let parsedProps = data.props;
+        if (typeof parsedProps === 'string') {
+            try {
+                parsedProps = JSON.parse(parsedProps);
+            } catch (e) {
+                console.error("Error parsing props:", e);
+                parsedProps = [];
+            }
+        }
+
         return {
             ...data,
-            terrain: parsedTerrain || data.terrain, // Fallback
+            id: data.id || doc.id,
+            terrain: parsedTerrain || data.terrain,
+            props: parsedProps || [],
             firestoreId: doc.id
         } as SavedBiome;
     });
@@ -159,9 +180,18 @@ export const loadBiomeById = async (id: string): Promise<SavedBiome | null> => {
             } catch (e) { }
         }
 
+        let parsedProps = data.props;
+        if (typeof parsedProps === 'string') {
+            try {
+                parsedProps = JSON.parse(parsedProps);
+            } catch (e) { }
+        }
+
         return {
             ...data,
+            id: data.id || snap.id,
             terrain: parsedTerrain || data.terrain,
+            props: parsedProps || [],
             firestoreId: snap.id
         } as SavedBiome;
     }
