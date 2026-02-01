@@ -179,7 +179,7 @@ function App() {
       const params = generateRandomParameters();
 
       // 2. Description (Gemini Pro)
-      setLoadingStep("Consulting Xenobiologist (Gemini 3 Pro)...");
+      setLoadingStep("Consulting Xenobiologist...");
       const detailedDesc = await generateBiomeDescription(params);
 
       // Update params with detailed info
@@ -188,7 +188,7 @@ function App() {
       params.skyDescription = detailedDesc.sky;
 
       // 3. Data (Gemini Flash)
-      setLoadingStep("Simulating Terrain Physics (Gemini 3 Flash)...");
+      setLoadingStep("Simulating Terrain Physics...");
       const newBiomeData = await generateBiomeData(detailedDesc, params);
 
       // 4. Texture (Flux)
@@ -312,17 +312,6 @@ function App() {
       'mode': {
         options: { 'Fly Mode': 'fly', 'Walk Mode': 'walk' },
         value: 'fly',
-      },
-      'Gravity': {
-        value: biome.parameters.gravity,
-        min: 0.1,
-        max: 3.0,
-        onChange: (v: number) => {
-          setBiome(prev => ({
-            ...prev,
-            parameters: { ...prev.parameters, gravity: v }
-          }));
-        }
       },
       'Weather System': {
         label: 'Auto Weather',
