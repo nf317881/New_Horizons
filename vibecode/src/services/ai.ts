@@ -114,13 +114,20 @@ export const generateBiomeData = async (description: string, params: BiomeParame
             "fogColor": "hex",
             "fogDensity": number (0.001 to 0.05),
             "sunIntensity": number (0.1 to 2.0)
+        },
+        "weather": {
+            "type": "rain" | "snow" | "sandstorm" | "spores",
+            "intensity": number (0 to 3),
+            "color": "hex",
+            "speed": number (0.5 to 5.0)
         }
     }
     
     CRITICAL PHYSICS RULES:
     1. TRAVERSABILITY: The terrain MUST be walkable. Avoid combinations of high noiseScale (>0.02) and high heightScale (>10) which create impenetrable spikes.
     2. COHERENCE: If you want big mountains, use low noiseScale (<0.005). If you want rocky detail, use low heightScale (<3).
-    3. Return ONLY JSON. No formatting blocks.
+    3. WEATHER: Match weather to environment (Snow for cold, Sandstorm for dry/hot, Spores for thick atmosphere).
+    4. Return ONLY JSON. No formatting blocks.
     `;
 
     const response = await fetch(OPENROUTER_API_URL, {
@@ -149,7 +156,8 @@ export const generateBiomeData = async (description: string, params: BiomeParame
         description: description,
         parameters: params,
         terrain: parsedContext.terrain,
-        atmosphere: parsedContext.atmosphere
+        atmosphere: parsedContext.atmosphere,
+        weather: parsedContext.weather || { type: 'none', intensity: 0, color: '#ffffff', speed: 1.0 }
     };
 };
 // 4. Generate Texture using "Nano Banana" (Gemini 2.5 Flash Image via OpenRouter)

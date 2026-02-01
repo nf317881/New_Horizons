@@ -9,6 +9,7 @@ import { PlayerControls } from './components/PlayerControls'
 import { Group } from 'three'
 import * as THREE from 'three'
 import { generateRandomParameters, generateBiomeDescription, generateBiomeData, generateBiomeTexture, generateSkyboxTexture } from './services/ai'
+import { Weather } from './components/Weather'
 
 function Skybox({ url }: { url: string }) {
   const { scene } = useThree();
@@ -28,11 +29,19 @@ function Skybox({ url }: { url: string }) {
   return null; // The texture is applied to the scene background, no mesh needed if we assume it's a skybox
 }
 
-function Scene({ biome, mode, setMode }: { biome: BiomeData, mode: 'fly' | 'walk', setMode: React.Dispatch<React.SetStateAction<'fly' | 'walk'>> }) {
+function Scene({ biome, mode, setMode, weatherActive }: {
+  biome: BiomeData,
+  mode: 'fly' | 'walk',
+  setMode: React.Dispatch<React.SetStateAction<'fly' | 'walk'>>,
+  weatherActive: boolean
+}) {
   const terrainRef = useRef<Group>(null);
 
   return (
     <>
+      {/* Weather System */}
+      <Weather params={biome.weather} active={weatherActive} />
+
       {/* Fallback Stars if no skybox */}
       {!biome.atmosphere.skyboxUrl && (
         <>
@@ -68,8 +77,6 @@ function Scene({ biome, mode, setMode }: { biome: BiomeData, mode: 'fly' | 'walk
         <meshBasicMaterial color="red" wireframe />
       </mesh>
 
-
-
       {/* Unified Controls for both modes */}
       <PlayerControls
         mode={mode}
@@ -89,6 +96,29 @@ function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const isGeneratingRef = useRef(false);
   const [loadingStep, setLoadingStep] = useState("");
+
+  // Weather dynamics
+  const [weatherEnabled, setWeatherEnabled] = useState(true);
+  const [weatherActive, setWeatherActive] = useState(false);
+
+  useEffect(() => {
+    if (!weatherEnabled) {
+      setWeatherActive(false);
+      return;
+    }
+
+    const toggleWeather = () => {
+      setWeatherActive(prev => !prev);
+      const nextToggle = Math.random() * 20000 + 10000;
+      return window.setTimeout(() => {
+        if (isGeneratingRef.current) return; // Don't toggle during gen
+        toggleWeather();
+      }, nextToggle);
+    };
+
+    const timer = toggleWeather();
+    return () => clearTimeout(timer);
+  }, [weatherEnabled]);
 
   const handleRegenerate = async () => {
     if (isGeneratingRef.current) return;
@@ -149,15 +179,26 @@ function App() {
   };
 
   // Leva controls for quick regeneration
-  useControls({
+  const [, setLeva] = useControls(() => ({
     'Regenerate World': button(() => {
       handleRegenerate();
     }),
     'Mode': {
       options: { 'Fly Mode': 'fly', 'Walk Mode': 'walk' },
+      value: mode,
       onChange: (v: string) => setMode(v as 'fly' | 'walk')
+    },
+    'Weather System': {
+      label: 'Auto Weather',
+      value: weatherEnabled,
+      onChange: (v: boolean) => setWeatherEnabled(v)
     }
-  })
+  }));
+
+  // Sync state -> Leva UI
+  useEffect(() => {
+    setLeva({ 'Mode': mode, 'Weather System': weatherEnabled });
+  }, [mode, weatherEnabled, setLeva]);
 
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#000' }}>
@@ -175,7 +216,7 @@ function App() {
         <h1 style={{ margin: 0, textTransform: 'uppercase', fontSize: '2rem' }}>{biome.name}</h1>
         <p style={{ margin: '0.5rem 0', opacity: 0.8, maxWidth: '400px' }}>{biome.description}</p>
         <div style={{ marginTop: '1rem', fontSize: '0.8rem', opacity: 0.6 }}>
-          LAYERS: {biome.terrain.layers.length} | GRAVITY: {biome.parameters.gravity}G
+          LAYERS: {biome.terrain.layers.length} | GRAVITY: {biome.parameters.gravity}G | WEATHER: {weatherActive ? (biome.weather.type.toUpperCase()) : "CLEAR"}
         </div>
       </div>
 
@@ -198,10 +239,12 @@ function App() {
         </div>
       )}
 
-      <Leva theme={{ colors: { highlight1: '#ff00ff', highlight2: '#00ffff' } }} />
+      <div onPointerDown={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
+        <Leva theme={{ colors: { highlight1: '#ff00ff', highlight2: '#00ffff' } }} />
+      </div>
 
       <Canvas shadows camera={{ position: [0, 5, 10], fov: 60 }}>
-        <Scene biome={biome} mode={mode} setMode={setMode} />
+        <Scene biome={biome} mode={mode} setMode={setMode} weatherActive={weatherActive} />
       </Canvas>
     </div>
   )

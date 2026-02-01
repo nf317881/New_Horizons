@@ -33,6 +33,13 @@ export interface BiomeParameters {
   skyDescription: string; // Specific for skybox
 }
 
+export interface WeatherParams {
+  type: 'none' | 'rain' | 'snow' | 'sandstorm' | 'spores';
+  intensity: number; // 0 to 1
+  color: string;
+  speed: number;
+}
+
 export interface BiomeData {
   id?: string; // Optional for now
   name: string;
@@ -40,4 +47,5 @@ export interface BiomeData {
   parameters: BiomeParameters;
   terrain: TerrainRules;
   atmosphere: AtmosphereParams;
+  weather: WeatherParams;
 }

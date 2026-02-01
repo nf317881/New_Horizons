@@ -40,6 +40,12 @@ export const generateMockBiome = (): BiomeData => {
             fogColor: '#87CEEB',
             fogDensity: 0.02,
             sunIntensity: 1.0
+        },
+        weather: {
+            type: 'none',
+            intensity: 0,
+            color: '#ffffff',
+            speed: 1.0
         }
     };
 };
