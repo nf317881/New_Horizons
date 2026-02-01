@@ -63,7 +63,8 @@ export const generateBiomeDescription = async (params: BiomeParameters): Promise
         },
         body: JSON.stringify({
             model: "google/gemini-3-flash-preview",
-            messages: [{ role: "user", content: prompt }]
+            messages: [{ role: "user", content: prompt }],
+            temperature: 1.2
         })
     });
 
