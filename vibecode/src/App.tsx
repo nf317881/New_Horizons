@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import { Stars } from '@react-three/drei'
 import { Leva, useControls, button } from 'leva'
 import { ChunkManager } from './components/ChunkManager'
+import AlienAmbience from './components/AlienAmbience'
 import { generateMockBiome } from './utils/mockGenerator'
 import type { BiomeData } from './types/biome'
 import { PlayerControls } from './components/PlayerControls'
@@ -173,6 +174,8 @@ function App() {
       <Canvas shadows camera={{ position: [0, 5, 10], fov: 60 }}>
         <Scene biome={biome} mode={mode} />
       </Canvas>
+
+      <AlienAmbience biome={biome} />
     </div>
   )
 }

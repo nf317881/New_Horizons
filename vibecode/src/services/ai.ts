@@ -99,7 +99,8 @@ export const generateBiomeData = async (description: string, params: BiomeParame
             "fogColor": "hex",
             "fogDensity": number (0.001 to 0.05),
             "sunIntensity": number (0.1 to 2.0)
-        }
+        },
+        "musicPrompt": "Ambient synth with low hums, mysterious and cold, instrumental only"
     }
     
     Return ONLY JSON. No formatting blocks.
@@ -131,6 +132,7 @@ export const generateBiomeData = async (description: string, params: BiomeParame
         description: description,
         parameters: params,
         terrain: parsedContext.terrain,
-        atmosphere: parsedContext.atmosphere
+        atmosphere: parsedContext.atmosphere,
+        musicPrompt: parsedContext.musicPrompt
     };
 };
