@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { useTexture } from '@react-three/drei';
 import type { BiomeData } from '../types/biome';
 import type { NoiseFunction2D } from 'simplex-noise';
+import { getTerrainHeight } from '../utils/terrainUtils';
 
 interface TerrainProps {
     data: BiomeData['terrain'] & { textureUrl?: string };

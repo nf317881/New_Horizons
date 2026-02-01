@@ -47,5 +47,6 @@ export interface BiomeData {
   parameters: BiomeParameters;
   terrain: TerrainRules;
   atmosphere: AtmosphereParams;
+  musicPrompt?: string; // Prompt for ElevenLabs Music API
   weather: WeatherParams;
 }

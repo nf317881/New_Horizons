@@ -115,6 +115,7 @@ export const generateBiomeData = async (description: string, params: BiomeParame
             "fogDensity": number (0.001 to 0.05),
             "sunIntensity": number (0.1 to 2.0)
         },
+        "musicPrompt": "An ambient space song for the biome; do not include vocals."
         "weather": {
             "type": "rain" | "snow" | "sandstorm" | "spores",
             "intensity": number (0 to 3),
@@ -157,6 +158,7 @@ export const generateBiomeData = async (description: string, params: BiomeParame
         parameters: params,
         terrain: parsedContext.terrain,
         atmosphere: parsedContext.atmosphere,
+        musicPrompt: parsedContext.musicPrompt
         weather: parsedContext.weather || { type: 'none', intensity: 0, color: '#ffffff', speed: 1.0 }
     };
 };

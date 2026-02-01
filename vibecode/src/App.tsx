@@ -3,6 +3,7 @@ import { Canvas, useThree, useFrame } from '@react-three/fiber'
 import { Stars, useTexture } from '@react-three/drei'
 import { Leva, useControls, button } from 'leva'
 import { ChunkManager } from './components/ChunkManager'
+import AlienAmbience from './components/AlienAmbience'
 import { generateMockBiome } from './utils/mockGenerator'
 import type { BiomeData } from './types/biome'
 import { PlayerControls } from './components/PlayerControls'
@@ -211,6 +212,40 @@ function App() {
       value: mode,
       onChange: (v: string) => setMode(v as 'fly' | 'walk')
     },
+    'Flora Parameters': {
+      value: false, // folder or boolean? Leva doesn't do folders easily in useControls object style without grouping
+    },
+    'Gravity': {
+      value: biome.parameters.gravity,
+      min: 0.1,
+      max: 3.0,
+      onChange: (v: number) => {
+        setBiome(prev => ({
+          ...prev,
+          parameters: { ...prev.parameters, gravity: v }
+        }));
+      }
+    },
+    'Temperature': {
+      value: biome.parameters.temperature,
+      min: -50,
+      max: 100,
+      onChange: (v: number) => {
+        setBiome(prev => ({
+          ...prev,
+          parameters: { ...prev.parameters, temperature: v }
+        }));
+      }
+    },
+    'Atmosphere': {
+      options: { 'Thin': 'Thin', 'Standard': 'Standard', 'Thick': 'Thick' },
+      value: biome.parameters.atmosphereDensity,
+      onChange: (v: string) => {
+        setBiome(prev => ({
+          ...prev,
+          parameters: { ...prev.parameters, atmosphereDensity: v }
+        }));
+      }
     'Weather System': {
       label: 'Auto Weather',
       value: weatherEnabled,
@@ -286,6 +321,8 @@ function App() {
       }}>
         <Scene biome={biome} mode={mode} setMode={setMode} weatherActive={weatherActive} />
       </Canvas>
+
+      <AlienAmbience biome={biome} />
     </div>
   )
 }

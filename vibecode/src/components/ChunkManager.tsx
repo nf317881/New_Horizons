@@ -2,6 +2,7 @@ import { createNoise2D } from 'simplex-noise';
 import React, { useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Terrain } from './Terrain';
+import { FloraSystem } from './FloraSystem';
 import type { BiomeData } from '../types/biome';
 import { Mesh, Group } from 'three';
 import * as THREE from 'three';
@@ -68,6 +69,13 @@ export const ChunkManager = React.forwardRef<THREE.Group, ChunkManagerProps>(({ 
                         chunkX={chunk.x}
                         chunkZ={chunk.z}
                         noise2D={noise2D}
+                    />
+                    <FloraSystem
+                        terrainData={biome.terrain}
+                        parameters={biome.parameters}
+                        noise2D={noise2D}
+                        chunkX={chunk.x}
+                        chunkZ={chunk.z}
                     />
                 </group>
             ))}
