@@ -40,6 +40,12 @@ export const generateMockBiome = (): BiomeData => {
             fogColor: '#87CEEB',
             fogDensity: 0.02,
             sunIntensity: 1.0
+        },
+        weather: {
+            type: 'spores',
+            intensity: 1.5,
+            color: '#ffaa44', // Warm orange spores
+            speed: 1.0
         }
     };
 };

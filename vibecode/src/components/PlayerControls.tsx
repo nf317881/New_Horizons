@@ -12,7 +12,7 @@ interface PlayerControlsProps {
 }
 
 export const PlayerControls: React.FC<PlayerControlsProps> = ({ mode, onToggleMode, gravityMult, terrainMesh }) => {
-    const { camera } = useThree();
+    const { camera, gl } = useThree();
     const controlsRef = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
     const raycaster = useRef(new Raycaster());
     const downVector = new Vector3(0, -1, 0);
@@ -45,6 +45,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ mode, onToggleMo
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.repeat) return;
             switch (event.code) {
                 case 'ArrowUp':
                 case 'KeyW': moveState.current.forward = true; break;
@@ -57,14 +58,16 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ mode, onToggleMo
                 case 'ShiftLeft':
                 case 'ShiftRight': moveState.current.shift = true; break;
                 case 'Space':
+                    if (event.repeat) return;
                     const now = Date.now();
-                    if (now - lastSpaceTime.current < 300) {
+                    const diff = now - lastSpaceTime.current;
+                    lastSpaceTime.current = now;
+
+                    if (diff < 300 && diff > 50) {
                         onToggleMode();
-                        // Reset space logic for this tap
                         moveState.current.up = false;
                         lastSpaceTime.current = 0;
                     } else {
-                        lastSpaceTime.current = now;
                         if (mode === 'fly') {
                             moveState.current.up = true;
                         } else if (isGrounded.current) {
@@ -201,7 +204,7 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ mode, onToggleMo
 
     return (
         <>
-            <PointerLockControls ref={controlsRef} />
+            <PointerLockControls ref={controlsRef} domElement={gl.domElement} />
             <pointLight ref={lightRef} intensity={5.0} distance={150} color="white" decay={1} />
         </>
     );

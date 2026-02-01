@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
+import { Canvas, useThree, useFrame } from '@react-three/fiber'
 import { Stars, useTexture } from '@react-three/drei'
 import { Leva, useControls, button } from 'leva'
 import { ChunkManager } from './components/ChunkManager'
@@ -9,6 +9,7 @@ import { PlayerControls } from './components/PlayerControls'
 import { Group } from 'three'
 import * as THREE from 'three'
 import { generateRandomParameters, generateBiomeDescription, generateBiomeData, generateBiomeTexture, generateSkyboxTexture } from './services/ai'
+import { Weather } from './components/Weather'
 
 function Skybox({ url }: { url: string }) {
   const { scene } = useThree();
@@ -28,11 +29,41 @@ function Skybox({ url }: { url: string }) {
   return null; // The texture is applied to the scene background, no mesh needed if we assume it's a skybox
 }
 
-function Scene({ biome, mode, setMode }: { biome: BiomeData, mode: 'fly' | 'walk', setMode: React.Dispatch<React.SetStateAction<'fly' | 'walk'>> }) {
+function DynamicFog({ biome, weatherActive }: { biome: BiomeData, weatherActive: boolean }) {
+  const { scene } = useThree();
+  const fogDensityRef = useRef(biome.atmosphere.fogDensity);
+
+  useFrame((_, delta) => {
+    if (scene.fog && scene.fog instanceof THREE.FogExp2) {
+      // Base fog is reduced if we have a skybox to see the sky better
+      const baseMult = biome.atmosphere.skyboxUrl ? 0.3 : 0.8;
+      // Weather significantly increases fog density
+      const weatherMult = weatherActive ? (1.2 + biome.weather.intensity) : 1.0;
+
+      const targetDensity = biome.atmosphere.fogDensity * baseMult * weatherMult;
+
+      // Smooth lerp
+      fogDensityRef.current = THREE.MathUtils.lerp(fogDensityRef.current, targetDensity, delta * 0.5);
+      scene.fog.density = fogDensityRef.current;
+    }
+  });
+
+  return null;
+}
+
+function Scene({ biome, mode, setMode, weatherActive }: {
+  biome: BiomeData,
+  mode: 'fly' | 'walk',
+  setMode: React.Dispatch<React.SetStateAction<'fly' | 'walk'>>,
+  weatherActive: boolean
+}) {
   const terrainRef = useRef<Group>(null);
 
   return (
     <>
+      {/* Weather System */}
+      <Weather params={biome.weather} active={weatherActive} />
+
       {/* Fallback Stars if no skybox */}
       {!biome.atmosphere.skyboxUrl && (
         <>
@@ -48,8 +79,9 @@ function Scene({ biome, mode, setMode }: { biome: BiomeData, mode: 'fly' | 'walk
         </React.Suspense>
       )}
 
-      {/* Fog - reduce density if we have a skybox to see it? */}
-      <fogExp2 attach="fog" args={[biome.atmosphere.fogColor, biome.atmosphere.fogDensity * (biome.atmosphere.skyboxUrl ? 0.2 : 0.5)]} />
+      {/* Fog - dynamic density based on weather */}
+      <fogExp2 attach="fog" args={[biome.atmosphere.fogColor, biome.atmosphere.fogDensity]} />
+      <DynamicFog biome={biome} weatherActive={weatherActive} />
 
       <ambientLight intensity={0.2} />
       <directionalLight
@@ -67,8 +99,6 @@ function Scene({ biome, mode, setMode }: { biome: BiomeData, mode: 'fly' | 'walk
         <boxGeometry args={[5, 5, 5]} />
         <meshBasicMaterial color="red" wireframe />
       </mesh>
-
-
 
       {/* Unified Controls for both modes */}
       <PlayerControls
@@ -89,6 +119,29 @@ function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const isGeneratingRef = useRef(false);
   const [loadingStep, setLoadingStep] = useState("");
+
+  // Weather dynamics
+  const [weatherEnabled, setWeatherEnabled] = useState(true);
+  const [weatherActive, setWeatherActive] = useState(false);
+
+  useEffect(() => {
+    if (!weatherEnabled) {
+      setWeatherActive(false);
+      return;
+    }
+
+    const toggleWeather = () => {
+      setWeatherActive(prev => !prev);
+      const nextToggle = Math.random() * 20000 + 10000;
+      return window.setTimeout(() => {
+        if (isGeneratingRef.current) return; // Don't toggle during gen
+        toggleWeather();
+      }, nextToggle);
+    };
+
+    const timer = toggleWeather();
+    return () => clearTimeout(timer);
+  }, [weatherEnabled]);
 
   const handleRegenerate = async () => {
     if (isGeneratingRef.current) return;
@@ -149,15 +202,26 @@ function App() {
   };
 
   // Leva controls for quick regeneration
-  useControls({
+  const [, setLeva] = useControls(() => ({
     'Regenerate World': button(() => {
       handleRegenerate();
     }),
     'Mode': {
       options: { 'Fly Mode': 'fly', 'Walk Mode': 'walk' },
+      value: mode,
       onChange: (v: string) => setMode(v as 'fly' | 'walk')
+    },
+    'Weather System': {
+      label: 'Auto Weather',
+      value: weatherEnabled,
+      onChange: (v: boolean) => setWeatherEnabled(v)
     }
-  })
+  }));
+
+  // Sync state -> Leva UI
+  useEffect(() => {
+    setLeva({ 'Mode': mode, 'Weather System': weatherEnabled });
+  }, [mode, weatherEnabled, setLeva]);
 
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#000' }}>
@@ -175,7 +239,7 @@ function App() {
         <h1 style={{ margin: 0, textTransform: 'uppercase', fontSize: '2rem' }}>{biome.name}</h1>
         <p style={{ margin: '0.5rem 0', opacity: 0.8, maxWidth: '400px' }}>{biome.description}</p>
         <div style={{ marginTop: '1rem', fontSize: '0.8rem', opacity: 0.6 }}>
-          LAYERS: {biome.terrain.layers.length} | GRAVITY: {biome.parameters.gravity}G
+          LAYERS: {biome.terrain.layers.length} | GRAVITY: {biome.parameters.gravity}G | WEATHER: {weatherActive ? (biome.weather.type.toUpperCase()) : "CLEAR"}
         </div>
       </div>
 
@@ -192,16 +256,35 @@ function App() {
           zIndex: 100,
           color: '#00ffff',
           fontFamily: "'Courier New', Courier, monospace",
+          pointerEvents: 'auto', // Ensure loading overlay blocks events
         }}>
           <h2 style={{ textTransform: 'uppercase', letterSpacing: '2px' }}>Generating New World</h2>
           <p>{loadingStep}</p>
         </div>
       )}
 
-      <Leva theme={{ colors: { highlight1: '#ff00ff', highlight2: '#00ffff' } }} />
+      <div
+        onMouseDown={e => e.stopPropagation()}
+        onPointerDown={e => e.stopPropagation()}
+        style={{
+          position: 'fixed',
+          top: 0,
+          right: 0,
+          zIndex: 1000,
+          pointerEvents: 'auto'
+        }}
+      >
+        <Leva theme={{ colors: { highlight1: '#ff00ff', highlight2: '#00ffff' } }} />
+      </div>
 
-      <Canvas shadows camera={{ position: [0, 5, 10], fov: 60 }}>
-        <Scene biome={biome} mode={mode} setMode={setMode} />
+      <Canvas shadows camera={{ position: [0, 5, 10], fov: 60 }} onPointerDown={(e) => {
+        // Explicitly activate PointerLockControls only when clicking the canvas itself
+        // This prevents Leva or other UI elements from triggering it.
+        if (e.target === e.currentTarget) {
+          (e.target as HTMLCanvasElement).requestPointerLock();
+        }
+      }}>
+        <Scene biome={biome} mode={mode} setMode={setMode} weatherActive={weatherActive} />
       </Canvas>
     </div>
   )
