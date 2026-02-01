@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react'
-import { Canvas, useThree } from '@react-three/fiber'
+import { Canvas, useThree, useFrame } from '@react-three/fiber'
 import { Stars, useTexture } from '@react-three/drei'
 import { Leva, useControls, button } from 'leva'
 import { ChunkManager } from './components/ChunkManager'
@@ -27,6 +27,28 @@ function Skybox({ url }: { url: string }) {
   }, [texture, scene]);
 
   return null; // The texture is applied to the scene background, no mesh needed if we assume it's a skybox
+}
+
+function DynamicFog({ biome, weatherActive }: { biome: BiomeData, weatherActive: boolean }) {
+  const { scene } = useThree();
+  const fogDensityRef = useRef(biome.atmosphere.fogDensity);
+
+  useFrame((_, delta) => {
+    if (scene.fog && scene.fog instanceof THREE.FogExp2) {
+      // Base fog is reduced if we have a skybox to see the sky better
+      const baseMult = biome.atmosphere.skyboxUrl ? 0.3 : 0.8;
+      // Weather significantly increases fog density
+      const weatherMult = weatherActive ? (1.2 + biome.weather.intensity) : 1.0;
+
+      const targetDensity = biome.atmosphere.fogDensity * baseMult * weatherMult;
+
+      // Smooth lerp
+      fogDensityRef.current = THREE.MathUtils.lerp(fogDensityRef.current, targetDensity, delta * 0.5);
+      scene.fog.density = fogDensityRef.current;
+    }
+  });
+
+  return null;
 }
 
 function Scene({ biome, mode, setMode, weatherActive }: {
@@ -57,8 +79,9 @@ function Scene({ biome, mode, setMode, weatherActive }: {
         </React.Suspense>
       )}
 
-      {/* Fog - reduce density if we have a skybox to see it? */}
-      <fogExp2 attach="fog" args={[biome.atmosphere.fogColor, biome.atmosphere.fogDensity * (biome.atmosphere.skyboxUrl ? 0.2 : 0.5)]} />
+      {/* Fog - dynamic density based on weather */}
+      <fogExp2 attach="fog" args={[biome.atmosphere.fogColor, biome.atmosphere.fogDensity]} />
+      <DynamicFog biome={biome} weatherActive={weatherActive} />
 
       <ambientLight intensity={0.2} />
       <directionalLight
@@ -233,17 +256,34 @@ function App() {
           zIndex: 100,
           color: '#00ffff',
           fontFamily: "'Courier New', Courier, monospace",
+          pointerEvents: 'auto', // Ensure loading overlay blocks events
         }}>
           <h2 style={{ textTransform: 'uppercase', letterSpacing: '2px' }}>Generating New World</h2>
           <p>{loadingStep}</p>
         </div>
       )}
 
-      <div onPointerDown={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
+      <div
+        onMouseDown={e => e.stopPropagation()}
+        onPointerDown={e => e.stopPropagation()}
+        style={{
+          position: 'fixed',
+          top: 0,
+          right: 0,
+          zIndex: 1000,
+          pointerEvents: 'auto'
+        }}
+      >
         <Leva theme={{ colors: { highlight1: '#ff00ff', highlight2: '#00ffff' } }} />
       </div>
 
-      <Canvas shadows camera={{ position: [0, 5, 10], fov: 60 }}>
+      <Canvas shadows camera={{ position: [0, 5, 10], fov: 60 }} onPointerDown={(e) => {
+        // Explicitly activate PointerLockControls only when clicking the canvas itself
+        // This prevents Leva or other UI elements from triggering it.
+        if (e.target === e.currentTarget) {
+          (e.target as HTMLCanvasElement).requestPointerLock();
+        }
+      }}>
         <Scene biome={biome} mode={mode} setMode={setMode} weatherActive={weatherActive} />
       </Canvas>
     </div>

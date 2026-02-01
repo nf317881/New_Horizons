@@ -58,14 +58,16 @@ export const PlayerControls: React.FC<PlayerControlsProps> = ({ mode, onToggleMo
                 case 'ShiftLeft':
                 case 'ShiftRight': moveState.current.shift = true; break;
                 case 'Space':
+                    if (event.repeat) return;
                     const now = Date.now();
-                    if (now - lastSpaceTime.current < 300) {
+                    const diff = now - lastSpaceTime.current;
+                    lastSpaceTime.current = now;
+
+                    if (diff < 300 && diff > 50) {
                         onToggleMode();
-                        // Reset space logic for this tap
                         moveState.current.up = false;
                         lastSpaceTime.current = 0;
                     } else {
-                        lastSpaceTime.current = now;
                         if (mode === 'fly') {
                             moveState.current.up = true;
                         } else if (isGrounded.current) {

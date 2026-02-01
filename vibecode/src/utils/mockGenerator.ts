@@ -42,9 +42,9 @@ export const generateMockBiome = (): BiomeData => {
             sunIntensity: 1.0
         },
         weather: {
-            type: 'none',
-            intensity: 0,
-            color: '#ffffff',
+            type: 'spores',
+            intensity: 1.5,
+            color: '#ffaa44', // Warm orange spores
             speed: 1.0
         }
     };
